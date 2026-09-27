@@ -1,7 +1,7 @@
 # 0001. Next.js, Supabase and Gemini stack on Vercel
 
 **Date**: 2026-09-27
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
@@ -50,7 +50,7 @@ Reasoning, options, and how each review finding was handled: see [rationale.md](
 | Email | None | Google only sign in sends no mail. |
 | Observability | Vercel runtime logs with one line JSON logs from the server; every AI and extraction attempt recorded in the database with its outcome (shared with spec #10) | The attempt record doubles as quota accounting and failure tracking. Add a hosted error tracker only if logs prove too thin. |
 | Hosting | Vercel Hobby on your personal account, Git integration: `main` deploys to production, pull requests get preview URLs. Functions pinned to region `fra1` (Frankfurt) | Free, zero ops, previews for every change. `fra1` sits next to the database; Vercel's default `iad1` (US East) would add a transatlantic hop to every query. Hobby is for non commercial use, which fits a course demo. |
-| Environments | Two Supabase cloud projects in `eu-central-1` (Frankfurt): `sotus-dev` (local + previews) and `sotus-prod` (production) | Safe to break dev; free tier allows two projects; no Docker needed; close to European users. |
+| Environments | **One** Supabase cloud project, `sotus-dev`, in `eu-central-1` (Frankfurt). All three Vercel environments (Development, Preview, Production) point at it. A second `sotus-prod` project is added only when real recipes are worth protecting from a broken migration | Free plan allows two active projects per organization and `bucys Org` already holds two others, so a second Sotus project means a new organization or pausing one. A demo does not need that yet. **Do not create a production Supabase project unless this row says so.** |
 | Repository | Dedicated **public** GitHub repo on your personal account, moved out of `AI_WORKSPACE` | Clean Vercel import, own history; course viewers can follow the code. Secrets live only in env vars, never in the repo. |
 | Testing | None required at the Alpha tier; each feature is proven with `/check verify`. The spike is a script, not a test suite. Vitest is added if a feature moves to Beta | Matches the workflow tier; avoids test setup before there is code to test. |
 
@@ -144,22 +144,53 @@ Acceptance rules, applied identically to JSON-LD results and Gemini results:
 
 A throwaway script, `scripts/spike-gemini-youtube.ts`, run locally against the paid tier key and the exact model ID intended for `GEMINI_MODEL`, using the real provider schema and prompt.
 
-| Video | Expected outcome |
-|---|---|
-| A typical 8 to 15 minute cooking video, recipe spoken | `recipe` |
-| A Short with the recipe spoken or shown on screen, not in the description | `recipe` |
-| A food video without a full recipe (no amounts or no method) | `insufficient` |
-| A non food video | `not_a_recipe` |
+Five videos, chosen so each one probes a different way the extraction can fail. The first two ask whether a stated recipe survives the round trip. The third asks whether a recipe can be rebuilt from watching alone, which is the capability that makes the YouTube demo worth having. The last two ask whether the model can tell "food, but not cookable" from "not food", because the acceptance contract gives those two outcomes different messages.
 
-Run each 3 times. Record in `rationale.md` under *Evidence: Gemini YouTube spike*: model ID and API version, schema accepted or not, per run latency, input and output tokens, cost per call, observed quotas and input limits (video length, videos per request), media resolution and thinking settings used, and each run's outcome with ingredient accuracy.
+| # | Video | Expected outcome | What it proves |
+|---|---|---|---|
+| 1 | A typical 8 to 15 minute cooking video, recipe spoken | `recipe` | The easy case works end to end |
+| 2 | A Short with the recipe spoken or shown on screen, not in the description | `recipe` | Short form works without the description |
+| 3 | A cooking demonstration with no spoken and no written recipe | `recipe` | Visual reconstruction: the model can read a recipe off the cooking itself |
+| 4 | Food content with nothing to cook from (a tasting video, a review, a montage with no method) | `insufficient` | Food content is not mistaken for non food, and not forced into a recipe |
+| 5 | A non food video | `not_a_recipe` | The outer boundary holds |
+
+Run each 3 times. Every call ends in exactly one of four buckets:
+
+| Bucket | Meaning | Counts as |
+|---|---|---|
+| `completed` | The provider returned an answer | The sample the classification and grounding rules are judged on |
+| `transient` | HTTP 429, 500 or 503, still failing after one retry | Provider load, not a wrong answer. Recorded, then the video is rerun |
+| `too_slow` | The call was cut off at the 55 s step deadline | A speed failure. Never silently dropped, and never counted as a wrong answer |
+| `error` | Anything else (bad schema, malformed output, network) | A real failure, investigate before judging the spike |
+
+**Rerun cap.** A video short of 3 completed runs is rerun, at most twice. Still short after that, it is **inconclusive**, which is a fail for a recipe video and is recorded as such. Without a cap a bad provider day loops forever and spends real money.
+
+Record in `rationale.md` under *Evidence: Gemini YouTube spike*: model ID and API version, schema accepted or not, per run latency, input and output tokens, cost per call (priced at the paid tier rate published for the exact model ID on the day of the run, quoted in the evidence), transient and `too_slow` counts, observed quotas and input limits (maximum video length accepted), media resolution and thinking settings used, and each run's outcome with ingredient accuracy.
 
 **Pass** when all of the following hold:
-- Both recipe videos return `recipe` in at least 2 of 3 runs, with every main ingredient present and no amount the video does not state.
-- The two other videos never return `recipe`.
-- Every run finishes within 55 s.
-- The schema is accepted.
+- **Classification.** All three recipe videos (1, 2, 3) return `recipe` in at least 2 of 3 completed runs. Videos 4 and 5 never return `recipe` in any completed run.
+- **Grounding.** Every `recipe` run passes the manual check below. A missing amount is correct and expected; an invented one is a failure.
+- **Shape.** Every `recipe` run has a non blank title, at least 2 named ingredients and at least 1 step. Matching the expected outcome is not enough on its own.
+- **Speed.** No `too_slow` calls. Because the script cuts a call off at 55 s, a slow call can never appear as a slow completed run, so `too_slow` is the only place slowness shows up.
+- **Schema.** The provider accepts the restricted response schema.
 
-**Fail**: do not build spec #7 on Gemini video. Rerun `/architect` to supersede the YouTube extraction row (the likely fallback is the video description via the YouTube Data API plus text extraction; not built now). Web page extraction (#6) does not depend on this spike.
+**The manual grounding check** (write down the result per run, so a second person reaches the same verdict):
+1. Watch the video once at normal speed. Write down every ingredient it names out loud or shows in writing, with the amount if one is given.
+2. A **main ingredient** is anything that goes into the dish and changes what it is. Salt, pepper, oil for the pan, water, and anything the video calls "to taste" are excluded.
+3. Compare. Every main ingredient on your list must be in the model's answer. Every amount in the model's answer must be on your list. An amount the model gives that you did not write down is invented, and the run fails.
+4. **A stable variance report is not a passed grounding check.** The script only flags amounts that change between runs. A model that invents the same wrong amount all three times prints as stable. That is the more likely failure, and only step 3 catches it.
+
+**Outcomes, in precedence order** (apply the first that matches):
+1. **Fail.** A recipe video is inconclusive, or fails classification, or fails grounding on video 1 or 2, or any `too_slow` call, or the schema is rejected. Videos 1 and 2 state their amounts out loud, so an invented amount there means the model is not reading the source at all.
+2. **Pass with amounts dropped from video.** Everything passes except grounding on video 3 alone. Keep visual reconstruction, but spec #7 saves no quantities or units from a video only source; every ingredient shows "amount not given". Silent demotion, not a blocker.
+3. **Partial pass.** Video 4 returns `not_a_recipe` instead of `insufficient`, while never returning `recipe`. Nothing wrong is saved, so this does not block building on Gemini video, but the two user messages cannot be told apart from the model's answer. Spec #7 either keeps prompting for the distinction or merges the two messages into one.
+4. **Pass.** Everything above holds.
+
+**On Fail**: do not build spec #7 on Gemini video. Rerun `/architect` to supersede the YouTube extraction row (the likely fallback is the video description via the YouTube Data API plus text extraction; not built now). Web page extraction (#6) does not depend on this spike.
+
+**The transient rate is evidence, not background.** Run 2 lost 5 of 12 calls to 503. Spec #7 must design for a provider that is sometimes unavailable, because a synchronous 75 s wait that then fails is a bad experience. Carry the observed rate into that spec.
+
+Video 3 deserves the closest reading. It is the strongest demo result if it passes, and also the highest grounding risk: with nothing spoken and nothing written, there is no stated amount anywhere, so every quantity the model returns is one it produced itself. That is why outcome 2 exists: the sensible answer to a video 3 grounding failure is to keep visual reconstruction and drop amounts, not to abandon Gemini.
 
 ### Folder layout
 
@@ -185,16 +216,16 @@ supabase/
 
 | Variable | Where | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Vercel (per environment) + `.env.local` | Supabase project URL; dev project for Development and Preview, prod project for Production. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Vercel (per environment) + `.env.local` | Supabase project URL. The same `sotus-dev` value in all three Vercel environments while there is one project. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | same | Public client key; safe in the browser because RLS guards the data. |
 | `GEMINI_API_KEY` | Vercel (server) + `.env.local` | Gemini API access, from a billing enabled Google AI Studio or Cloud project. |
 | `GEMINI_MODEL` | same | Exact Gemini Flash model ID confirmed by the spike, so upgrading the model is a config change. |
 
-Quota limits are not env vars (see *Cost guard*). Set up with the Gemini key during the scaffold: billing on, the €5 budget alert and the €10 spend cap. Set up in **spec #5 Sign in, not the scaffold**: the Google OAuth client ID and secret (Supabase Auth settings, one OAuth client per Supabase project), and the Supabase Site URL and redirect allow list (the prod URL for `sotus-prod`; `http://localhost:3000/**` and the Vercel preview wildcard for `sotus-dev`). Commit a `.env.example` listing the variables without values.
+Quota limits are not env vars (see *Cost guard*). Set up with the Gemini key during the scaffold: billing on, the €5 budget alert and the €10 spend cap. Set up in **spec #5 Sign in, not the scaffold**: the Google OAuth client ID and secret (Supabase Auth settings, one OAuth client for the one project), and the Supabase Site URL and redirect allow list on `sotus-dev`, holding the production URL, `http://localhost:3000/**` and the Vercel preview wildcard together. Commit a `.env.example` listing the variables without values.
 
 ### Scaffold scope (for `/develop stack & architecture`)
 
-The feature's "done when" is an empty scaffold that runs locally, builds clean and is live at a shareable URL. So the scaffold covers: the new repo, the Next.js app with the stack above installed and configured, shadcn/ui initialized (defaults, CSS variables), the Supabase clients and `proxy.ts` wired to the dev project, the empty `supabase/migrations/` folder, `.env.example`, Gemini billing and caps, and the Vercel project (region `fra1`) with both environments' variables set. The Gemini YouTube spike runs alongside it. The scaffold does **not** build sign in or configure Google OAuth (#5), tables or the quota functions (#3), `safeFetch` and extraction (#6, #7), or the design system (#4). Those features build to the rules in this spec.
+The feature's "done when" is an empty scaffold that runs locally, builds clean and is live at a shareable URL. So the scaffold covers: the new repo, the Next.js app with the stack above installed and configured, shadcn/ui initialized (defaults, CSS variables), the Supabase clients and `proxy.ts` wired to the one `sotus-dev` project, the empty `supabase/migrations/` folder, `.env.example`, Gemini billing and caps, and the Vercel project (region `fra1`) with its environment variables set. The Gemini YouTube spike runs alongside it. The scaffold does **not** build sign in or configure Google OAuth (#5), tables or the quota functions (#3), `safeFetch` and extraction (#6, #7), or the design system (#4). Those features build to the rules in this spec.
 
 ## Consequences
 
@@ -212,11 +243,11 @@ The feature's "done when" is an empty scaffold that runs locally, builds clean a
 - **Failures cost quota.** A user whose links keep failing hits the daily limit sooner.
 - **Synchronous extraction** keeps the user waiting up to 75 s on a slow video. Moving to a background job later means adding a status to recipes.
 - **One new dependency** (`undici`) for connect time address checks, and hand written SQL functions for quota that spec #3 must get right.
-- **Supabase free projects pause after about a week without activity.** You chose to handle this by hand: open the prod project in the Supabase dashboard before any demo, or the first request fails.
+- **Supabase free projects pause after about a week without activity.** You chose to handle this by hand: open `sotus-dev` in the Supabase dashboard before any demo, or the first request fails.
 - **RLS policies must be right.** A wrong policy is a real security bug; spec #3 must include policy tests (checks run as two different users).
 - **Server Actions are not a public API.** A future native app (deferred) will need Route Handlers added.
 - **Vercel Hobby is non commercial only.** Charging for Sotus would require the Pro plan.
-- **Two Supabase projects** mean every migration is pushed twice (dev, then prod) and Google OAuth is configured twice.
+- **One Supabase project** means local work, previews and production share a database: a broken migration or a wiped table hits the demo too, and there is no safe place to try a migration first. The trade is one migration push instead of two and one OAuth client instead of two. Split into `sotus-dev` and `sotus-prod` before Sotus holds recipes anyone would miss.
 
 **Neutral**:
 - New patterns to learn: RLS policies, `SECURITY DEFINER` functions, the `@supabase/ssr` cookie flow, Gemini structured output.
@@ -233,4 +264,7 @@ The feature's "done when" is an empty scaffold that runs locally, builds clean a
 - [ ] Spec #12: reserve quota with `kind = cook_pick` before each AI call.
 - [ ] No project `AGENTS.md` exists yet. When `/audit` (feature #2) creates it, list in `## Agent skills` (all project wide, root level): the user level `supabase` and `supabase-postgres-best-practices`, plus the project skills installed on 2026-09-27 in `.claude/skills/` (`vercel-react-best-practices`, `vercel-composition-patterns`, `deploy-to-vercel`, `vercel-cli-with-tokens`, `next-dev-loop`, `shadcn`). `MCP servers:` Vercel MCP, Next.js devtools MCP. `Declined:` Tailwind v4 docs and zod community skills, shadcn community MCP.
 - [ ] In the new repo, check `.claude/skills/` is not ignored by git so the installed skills travel with the code.
-- [ ] Before a demo: wake the prod Supabase project (it pauses when idle).
+- [ ] Before a demo: wake the `sotus-dev` Supabase project (it pauses when idle).
+- [ ] `scripts/spike-gemini-youtube.ts` does not yet match the spike rules above: it has no `too_slow` bucket (a call cut off at 55 s lands in `error`) and no rerun top up for a video short of 3 completed runs. Fix both, and add a way to rerun one video alone, before the next spike run.
+- [ ] Spec #7 must handle links the spike does not cover: a very long video, a non English video, and a private, deleted or region blocked link. The spike answers whether Gemini can read a video at all, not whether it survives arbitrary user links.
+- [ ] Split into `sotus-dev` and `sotus-prod` once Sotus holds recipes worth keeping. Needs a second Supabase organization or a paused project, then a second OAuth client, a second redirect allow list and every migration pushed twice. Until this is done, treat `sotus-dev` as the only Supabase project and do not create another.

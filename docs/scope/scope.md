@@ -33,9 +33,9 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 ### 1. Stack & architecture · in-progress
 Decide the web stack, hosting, sign in approach, and AI provider, then scaffold a runnable project that deploys to a public URL.
 **Done when:** the stack is recorded in a spec, and the empty scaffold runs locally, builds clean, and is live at a shareable URL.
-spec [0001](../specs/0001-stack-architecture/index.md) · code in (set by /develop)
+spec [0001](../specs/0001-stack-architecture/index.md) · code in `src/`, `supabase/`, `scripts/`
 - [x] Decide the stack (spec): `/architect stack & architecture`
-- [ ] Scaffold from the decision: `/develop stack & architecture`
+- [x] Scaffold from the decision: `/develop stack & architecture`
   - [ ] Gemini YouTube feasibility spike, evidence recorded in spec 0001 `rationale.md` (gates #7, not the scaffold)
 - [ ] Verify it: `/check verify stack & architecture`
 
