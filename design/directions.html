@@ -1,0 +1,336 @@
+<style>
+  :root{
+    /* shell neutrals — warm, hue-biased toward food/kitchen, not pure grey */
+    --bg:#F3EDE1; --surface:#FBF7EE; --surface-2:#EFE7D6;
+    --ink:#241F17; --ink-2:#5C5344; --hair:#E0D6C2;
+    --shell-accent:#8A5A2B;
+    --maxw:1080px;
+    --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#16130E; --surface:#1F1A13; --surface-2:#251F16;
+      --ink:#F1E9D9; --ink-2:#B6A98F; --hair:#332B1F; --shell-accent:#D99A5B; }
+  }
+  :root[data-theme="light"]{ --bg:#F3EDE1; --surface:#FBF7EE; --surface-2:#EFE7D6;
+    --ink:#241F17; --ink-2:#5C5344; --hair:#E0D6C2; --shell-accent:#8A5A2B; }
+  :root[data-theme="dark"]{ --bg:#16130E; --surface:#1F1A13; --surface-2:#251F16;
+    --ink:#F1E9D9; --ink-2:#B6A98F; --hair:#332B1F; --shell-accent:#D99A5B; }
+
+  *{ box-sizing:border-box; }
+  body{ margin:0; }
+  .page{ background:var(--bg); color:var(--ink); font-family:var(--sans);
+    line-height:1.55; -webkit-font-smoothing:antialiased; padding:clamp(20px,5vw,64px) 20px 80px; }
+  .wrap{ max-width:var(--maxw); margin:0 auto; }
+  .eyebrow{ font-size:12px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--shell-accent); font-weight:700; margin:0 0 14px; }
+  h1{ font-family:var(--serif); font-weight:600; font-size:clamp(30px,5.5vw,52px);
+    line-height:1.05; letter-spacing:-.01em; text-wrap:balance; margin:0 0 16px; }
+  h1 em{ font-style:italic; color:var(--shell-accent); }
+  .lede{ font-size:clamp(16px,2.1vw,20px); color:var(--ink-2); max-width:60ch; margin:0 0 8px; }
+  h2{ font-family:var(--serif); font-weight:600; font-size:clamp(22px,3.2vw,30px);
+    letter-spacing:-.01em; margin:0 0 6px; text-wrap:balance; }
+  h3{ font-size:15px; letter-spacing:.02em; margin:0 0 8px; }
+  p{ margin:0 0 12px; }
+  .muted{ color:var(--ink-2); }
+  .rule{ height:1px; background:var(--hair); border:0; margin:clamp(40px,6vw,72px) 0; }
+  section{ margin-top:clamp(36px,5vw,60px); }
+  .sec-head{ display:flex; align-items:baseline; gap:14px; margin-bottom:24px; }
+  .sec-num{ font-family:var(--serif); font-size:14px; color:var(--shell-accent);
+    font-variant-numeric:tabular-nums; }
+
+  /* context cards */
+  .ctx{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:640px){ .ctx{ grid-template-columns:1fr; } }
+  .card{ background:var(--surface); border:1px solid var(--hair); border-radius:14px;
+    padding:22px; }
+  .card h3{ display:flex; align-items:center; gap:10px; }
+  .dot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+  .card ul{ margin:10px 0 0; padding-left:18px; color:var(--ink-2); font-size:14.5px; }
+  .card li{ margin:5px 0; }
+
+  /* principle chips */
+  .principles{ display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+  .chip{ font-size:13px; background:var(--surface-2); border:1px solid var(--hair);
+    color:var(--ink); padding:7px 13px; border-radius:999px; }
+  .chip b{ color:var(--shell-accent); }
+
+  /* ---- direction specimens ---- */
+  .dir{ border-radius:20px; overflow:hidden; border:1px solid var(--hair);
+    margin-top:26px; box-shadow:0 1px 0 rgba(0,0,0,.03); }
+  .dir-top{ padding:26px clamp(20px,3.5vw,34px) 22px; }
+  .dir-name{ font-weight:700; font-size:clamp(24px,3.6vw,34px); letter-spacing:-.01em;
+    margin:0 0 4px; }
+  .dir-tag{ font-size:14px; opacity:.85; margin:0 0 18px; }
+  .swatches{ display:flex; flex-wrap:wrap; gap:0; border-radius:12px; overflow:hidden;
+    border:1px solid rgba(0,0,0,.08); }
+  .sw{ flex:1 1 90px; min-width:90px; height:74px; display:flex; flex-direction:column;
+    justify-content:flex-end; padding:8px 10px; font-size:11px; font-weight:600;
+    letter-spacing:.02em; }
+  .sw span{ display:block; opacity:.72; font-weight:500; font-variant-numeric:tabular-nums; }
+
+  .dir-body{ display:grid; grid-template-columns:1.05fr .95fr; gap:0; }
+  @media (max-width:720px){ .dir-body{ grid-template-columns:1fr; } }
+  .spec, .mock{ padding:24px clamp(20px,3.5vw,34px); }
+  .spec{ border-right:1px solid rgba(0,0,0,.08); }
+  @media (max-width:720px){ .spec{ border-right:0; border-bottom:1px solid rgba(0,0,0,.08); } }
+  .type-lab{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; opacity:.6; margin:0 0 6px; }
+  .type-display{ font-size:30px; line-height:1.05; margin:0 0 4px; letter-spacing:-.01em; }
+  .type-note{ font-size:12.5px; opacity:.65; margin:0 0 18px; }
+  .type-body{ font-size:14.5px; line-height:1.6; opacity:.9; margin:0 0 14px; max-width:34ch; }
+  .nums{ font-variant-numeric:tabular-nums; font-size:15px; opacity:.9; letter-spacing:.02em; }
+
+  /* mock recipe card */
+  .rcard{ border-radius:14px; overflow:hidden; }
+  .rphoto{ height:120px; position:relative; }
+  .plate{ position:absolute; left:50%; top:54%; transform:translate(-50%,-50%);
+    width:78px; height:78px; border-radius:50%; }
+  .plate::after{ content:""; position:absolute; inset:16px; border-radius:50%; }
+  .rmeta{ padding:12px 14px; }
+  .rtitle{ font-weight:700; font-size:16px; margin:0 0 8px; letter-spacing:-.01em; }
+  .badges{ display:flex; gap:6px; flex-wrap:wrap; }
+  .badge{ font-size:11px; padding:3px 9px; border-radius:999px; font-weight:600; letter-spacing:.02em; }
+  .badge.inf{ display:inline-flex; align-items:center; gap:5px; }
+  .badge.inf::before{ content:""; width:5px; height:5px; border-radius:50%; background:currentColor; opacity:.7; }
+
+  /* week strip */
+  .week{ display:flex; gap:6px; margin-top:14px; }
+  .day{ flex:1; border-radius:9px; padding:8px 6px; text-align:center; font-size:11px; }
+  .day b{ display:block; font-size:10px; opacity:.6; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin-bottom:5px; }
+  .day .meal{ font-weight:600; font-size:11px; line-height:1.2; }
+
+  .rationale{ display:grid; grid-template-columns:1fr 1fr; gap:14px 24px; margin-top:6px; }
+  @media (max-width:640px){ .rationale{ grid-template-columns:1fr; } }
+  .rationale .lbl{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; opacity:.55; margin:0 0 4px; }
+  .rationale p{ font-size:14px; margin:0; }
+
+  .foot{ background:var(--surface); border:1px solid var(--hair); border-radius:16px;
+    padding:26px clamp(20px,3.5vw,34px); margin-top:40px; }
+  .rec{ display:flex; gap:12px; align-items:flex-start; }
+  .rec .k{ font-weight:700; color:var(--shell-accent); font-family:var(--serif); }
+  a:focus-visible, [tabindex]:focus-visible{ outline:2px solid var(--shell-accent); outline-offset:3px; }
+</style>
+
+<div class="page">
+<div class="wrap">
+
+  <p class="eyebrow">Sotus · Vizualinės kryptys</p>
+  <h1>Recepto herojus yra <em>maistas</em>, ne interfeisas.</h1>
+  <p class="lede">Sotus gyvena tarp dviejų kontekstų: atsipalaidavusio planavimo ant sofos ir greito, rankomis‑užimto žvilgsnio virtuvėje bei parduotuvėje. Dizainas seka iš to — ne iš madų.</p>
+  <p class="lede muted">Trys kryptys, pritaikytos būtent šiam appsui. Perjunk temą viršuje, kad pamatytum abi.</p>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>Kaip appsas realiai naudojamas</h2></div>
+    <div class="ctx">
+      <div class="card">
+        <h3><span class="dot" style="background:#3F5230"></span>Planuojant (sofa, laisvas laikas)</h3>
+        <p class="muted" style="font-size:14.5px;margin:0">Naršai receptus, dėlioji savaitę, tikslinsi AI‑ištrauktą receptą.</p>
+        <ul>
+          <li>Nuotraukos vedančios — apetitas kviečia liesti</li>
+          <li>Bento/kortelių tinklas, ramus ritmas</li>
+          <li>Vietos redaguoti confirmed vs. inferred</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="dot" style="background:#C4553B"></span>Virtuvėje / parduotuvėje (rankos užimtos)</h3>
+        <p class="muted" style="font-size:14.5px;margin:0">Greitas žvilgsnis: „ką gaminam", žingsniai, pirkinių atžymėjimas.</p>
+        <ul>
+          <li>Didelis šriftas, dideli tap‑target'ai, viena ranka</li>
+          <li>Aukštas kontrastas — ryškioj šviesoj įskaitoma</li>
+          <li>Būsena forma, ne tik spalva (atžymėta / liko)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="principles">
+      <span class="chip"><b>Photo‑first</b> — chrome traukiasi</span>
+      <span class="chip"><b>Glanceable</b> — įskaitoma per sekundę</span>
+      <span class="chip"><b>Šilta, apetitiška</b> — ne sterili technika</span>
+      <span class="chip"><b>Rami confidence kalba</b> — ne raudona klaida</span>
+      <span class="chip"><b>Bento</b> tinklas receptams ir kalendoriui</span>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>Trys kryptys</h2></div>
+    <p class="lede muted" style="margin-bottom:0">Kiekviena su savo palete, tipografijos ketinimu ir mockup'u. Šriftai čia rodomi sistemos atsargine versija — nurodytas gamybinis šriftas.</p>
+
+    <!-- DIRECTION 1: SODRUS -->
+    <div class="dir" style="background:#FBF7EE;color:#241F17">
+      <div class="dir-top">
+        <p class="dir-name" style="color:#3F5230">Sodrus</p>
+        <p class="dir-tag">Namų virtuvės šiluma · žolelių žalia veda, paprikos akcentas</p>
+        <div class="swatches">
+          <div class="sw" style="background:#F4EEE1;color:#241F17">Oat<span>#F4EEE1</span></div>
+          <div class="sw" style="background:#3F5230;color:#F4EEE1">Herb<span>#3F5230</span></div>
+          <div class="sw" style="background:#D2803A;color:#221108">Paprika<span>#D2803A</span></div>
+          <div class="sw" style="background:#221E17;color:#F4EEE1">Ink<span>#221E17</span></div>
+          <div class="sw" style="background:#EFE7D6;color:#241F17">Surface<span>#EFE7D6</span></div>
+        </div>
+      </div>
+      <div class="dir-body">
+        <div class="spec">
+          <p class="type-lab">Tipografija</p>
+          <p class="type-display" style="font-family:var(--sans);font-weight:800;color:#3F5230">Vištiena su makaronais</p>
+          <p class="type-note">Display: <b>Bricolage Grotesque</b> · Body: <b>Hanken Grotesk</b></p>
+          <p class="type-body">Šiltas grotesque — draugiškas, sodrus, be mados serifo pretenzijų. Skaitosi ir sofoj, ir prie viryklės.</p>
+          <p class="nums">220 g · 180 ml · 45 min · 520 kcal</p>
+        </div>
+        <div class="mock">
+          <div class="rcard" style="background:#F4EEE1;border:1px solid #E2D8C4">
+            <div class="rphoto" style="background:linear-gradient(150deg,#6E7B4A,#3F5230 70%)">
+              <div class="plate" style="background:#EEE6D4"><i style="position:absolute;inset:16px;border-radius:50%;background:#C98A4E"></i></div>
+            </div>
+            <div class="rmeta">
+              <p class="rtitle">Pad Thai su krevetėmis</p>
+              <div class="badges">
+                <span class="badge" style="background:#3F5230;color:#F4EEE1">Patvirtinta</span>
+                <span class="badge inf" style="background:#F0E2CB;color:#8A5A2B">Numanoma · cukrus</span>
+              </div>
+            </div>
+          </div>
+          <div class="week">
+            <div class="day" style="background:#EFE7D6"><b>Pr</b><span class="meal">Vištiena</span></div>
+            <div class="day" style="background:#3F5230;color:#F4EEE1"><b>An</b><span class="meal">Likutis</span></div>
+            <div class="day" style="background:#EFE7D6"><b>Tr</b><span class="meal">Žuvis</span></div>
+            <div class="day" style="background:#EFE7D6"><b>Kt</b><span class="meal">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="spec" style="border-right:0;border-top:1px solid rgba(0,0,0,.08)">
+        <div class="rationale">
+          <div><p class="lbl">Jausmas</p><p>Jauku, asmeniška, apetitiška — „tavo receptų knyga", ne dashboard'as.</p></div>
+          <div><p class="lbl">Tinka</p><p>Emociniam „mūsų namų virtuvė" tikslui; labiausiai anti‑generinis.</p></div>
+          <div><p class="lbl">Atsargiai</p><p>Šiluma turi vengti nuvalkioto cream+serif look'o — todėl žalia veda, ne terakota, ir grotesque, ne serifas.</p></div>
+          <div><p class="lbl">Dark tema</p><p>Gilus grybų/žemės rudas su ta pačia žolele ir vario akcentu.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIRECTION 2: TURGUS -->
+    <div class="dir" style="background:#FCFBF7;color:#15201A">
+      <div class="dir-top">
+        <p class="dir-name" style="color:#1F9254">Turgus</p>
+        <p class="dir-tag">Šviežio turgaus energija · ryšku, švaru, geriausias įskaitomumas</p>
+        <div class="swatches">
+          <div class="sw" style="background:#FCFBF7;color:#15201A;border-right:1px solid #eee">Paper<span>#FCFBF7</span></div>
+          <div class="sw" style="background:#1F9254;color:#fff">Leaf<span>#1F9254</span></div>
+          <div class="sw" style="background:#F2A200;color:#3a2600">Citrus<span>#F2A200</span></div>
+          <div class="sw" style="background:#15201A;color:#fff">Ink<span>#15201A</span></div>
+          <div class="sw" style="background:#EAF1EA;color:#15201A">Surface<span>#EAF1EA</span></div>
+        </div>
+      </div>
+      <div class="dir-body">
+        <div class="spec">
+          <p class="type-lab">Tipografija</p>
+          <p class="type-display" style="font-family:var(--sans);font-weight:700;letter-spacing:-.02em;color:#15201A">Vištiena su makaronais</p>
+          <p class="type-note">Display: <b>Cabinet Grotesk</b> · Body: <b>General Sans</b></p>
+          <p class="type-body">Geometriškai‑humanistinis, aukšto kontrasto. Tabular skaičiai kiekiams — pirkinių sąrašas skaitosi iš tolo.</p>
+          <p class="nums">220 g · 180 ml · 45 min · 520 kcal</p>
+        </div>
+        <div class="mock">
+          <div class="rcard" style="background:#fff;border:1px solid #E7EDE7">
+            <div class="rphoto" style="background:linear-gradient(150deg,#37B26A,#1F9254 72%)">
+              <div class="plate" style="background:#fff"><i style="position:absolute;inset:16px;border-radius:50%;background:#F2A200"></i></div>
+            </div>
+            <div class="rmeta">
+              <p class="rtitle">Pad Thai su krevetėmis</p>
+              <div class="badges">
+                <span class="badge" style="background:#1F9254;color:#fff">Patvirtinta</span>
+                <span class="badge inf" style="background:#FDEFCF;color:#9A6B00">Numanoma · cukrus</span>
+              </div>
+            </div>
+          </div>
+          <div class="week">
+            <div class="day" style="background:#EAF1EA"><b>Pr</b><span class="meal">Vištiena</span></div>
+            <div class="day" style="background:#1F9254;color:#fff"><b>An</b><span class="meal">Likutis</span></div>
+            <div class="day" style="background:#EAF1EA"><b>Tr</b><span class="meal">Žuvis</span></div>
+            <div class="day" style="background:#EAF1EA"><b>Kt</b><span class="meal">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="spec" style="border-right:0;border-top:1px solid rgba(0,0,0,.08)">
+        <div class="rationale">
+          <div><p class="lbl">Jausmas</p><p>Švieža, moderni, energinga — kaip gerai suprojektuota maisto app'sė.</p></div>
+          <div><p class="lbl">Tinka</p><p>Maksimaliam įskaitomumui parduotuvėj/virtuvėj; saugiausias variantas.</p></div>
+          <div><p class="lbl">Atsargiai</p><p>Ryškumas gali tapti „generiškas šviežias", jei paletė be niuansų — laikom akcentą viename.</p></div>
+          <div><p class="lbl">Dark tema</p><p>Gili miško žalia su citrusiniu akcentu, aukštas kontrastas.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIRECTION 3: VAKARIENE -->
+    <div class="dir" style="background:#17130E;color:#F0E7D8;border-color:#332B1F">
+      <div class="dir-top">
+        <p class="dir-name" style="color:#D99A5B">Vakarienė</p>
+        <p class="dir-tag">Šefo staltiesė · tamsu, kinematografiška, maistas švyti</p>
+        <div class="swatches" style="border-color:rgba(255,255,255,.12)">
+          <div class="sw" style="background:#17130E;color:#F0E7D8">Charcoal<span>#17130E</span></div>
+          <div class="sw" style="background:#251F16;color:#F0E7D8">Surface<span>#251F16</span></div>
+          <div class="sw" style="background:#D99A5B;color:#2a1a08">Copper<span>#D99A5B</span></div>
+          <div class="sw" style="background:#93A98C;color:#12160f">Sage<span>#93A98C</span></div>
+          <div class="sw" style="background:#F0E7D8;color:#17130E">Cream<span>#F0E7D8</span></div>
+        </div>
+      </div>
+      <div class="dir-body">
+        <div class="spec" style="border-right-color:rgba(255,255,255,.1)">
+          <p class="type-lab" style="opacity:.55">Tipografija</p>
+          <p class="type-display" style="font-family:var(--sans);font-weight:700;letter-spacing:-.02em;color:#F0E7D8">Vištiena su makaronais</p>
+          <p class="type-note" style="opacity:.6">Display: <b>Clash Display</b> · Body: <b>Switzer</b></p>
+          <p class="type-body" style="opacity:.85">Rafinuotas grotesque tamsoje. Vakaro gaminimui — mažiau akinimo, nuotrauka dominuoja kaip lėkštėje.</p>
+          <p class="nums" style="opacity:.85">220 g · 180 ml · 45 min · 520 kcal</p>
+        </div>
+        <div class="mock">
+          <div class="rcard" style="background:#251F16;border:1px solid #3a3020">
+            <div class="rphoto" style="background:linear-gradient(150deg,#4a3a24,#17130E 78%)">
+              <div class="plate" style="background:#2f2618"><i style="position:absolute;inset:16px;border-radius:50%;background:#D99A5B"></i></div>
+            </div>
+            <div class="rmeta">
+              <p class="rtitle" style="color:#F0E7D8">Pad Thai su krevetėmis</p>
+              <div class="badges">
+                <span class="badge" style="background:#D99A5B;color:#2a1a08">Patvirtinta</span>
+                <span class="badge inf" style="background:#2f2a20;color:#C9B48C">Numanoma · cukrus</span>
+              </div>
+            </div>
+          </div>
+          <div class="week">
+            <div class="day" style="background:#251F16;color:#cdbfa6"><b>Pr</b><span class="meal">Vištiena</span></div>
+            <div class="day" style="background:#D99A5B;color:#2a1a08"><b>An</b><span class="meal">Likutis</span></div>
+            <div class="day" style="background:#251F16;color:#cdbfa6"><b>Tr</b><span class="meal">Žuvis</span></div>
+            <div class="day" style="background:#251F16;color:#cdbfa6"><b>Kt</b><span class="meal">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="spec" style="border-right:0;border-top:1px solid rgba(255,255,255,.1)">
+        <div class="rationale">
+          <div><p class="lbl" style="opacity:.55">Jausmas</p><p>Premium, susikaupęs, jaukus vakarui — maistas atrodo kaip ant šefo stalo.</p></div>
+          <div><p class="lbl" style="opacity:.55">Tinka</p><p>Vakaro gaminimui ir naršymui; stipriausias nuotraukoms.</p></div>
+          <div><p class="lbl" style="opacity:.55">Atsargiai</p><p>Ryškioj parduotuvės šviesoj tamsi tema prasčiau įskaitoma — geriau kaip dark tema, ne vienintelė.</p></div>
+          <div><p class="lbl" style="opacity:.55">Light tema</p><p>Šilta kreminė su vario ir žalsvos akcentais dienai.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Bendri UX principai (nepriklauso nuo krypties)</h2></div>
+    <div class="ctx" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="card"><h3>Confidence kalba</h3><p class="muted" style="font-size:14px;margin:0">Patvirtinta = pilnas akcentas. Numanoma = švelnus „AI spėjo" ženklas su tašku, ne raudona. Neaišku = klausiama tik kai receptas tikrai naujas.</p></div>
+      <div class="card"><h3>Glanceable režimas</h3><p class="muted" style="font-size:14px;margin:0">Virtuvėj/parduotuvėj — didesnis šriftas, dideli tap‑target'ai, atžymėjimas viena ranka, tabular skaičiai.</p></div>
+      <div class="card"><h3>Judesys saikingai</h3><p class="muted" style="font-size:14px;margin:0">Draft→saved patvirtinimas, kortelės lietimas, pirkinio atžymėjimas. Jokių dekoratyvių efektų — jie ir daro AI‑generic jausmą.</p></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div class="rec">
+      <span class="k">Rekomendacija</span>
+      <p style="margin:0">Bazė — <b>Sodrus</b> (labiausiai anti‑generinis, atitinka „mūsų namų virtuvė" jausmą), o <b>Vakarienė</b> paletė tampa dark tema vakaro gaminimui. Jei prioritetas grynas įskaitomumas parduotuvėj — pradedam nuo <b>Turgus</b>. Light lieka default (geriausia ryškioj šviesoj), dark — vakarui.</p>
+    </div>
+    <p class="muted" style="font-size:13.5px;margin:16px 0 0">Kai pasirinksi kryptį, ją užrakinsiu į <b>design.md</b> kaip Sotus dizaino sistemą (spalvų token'ai, tipų skalė, komponentų taisyklės), pagal kurią eis visas build'as.</p>
+  </div>
+
+</div>
+</div>
