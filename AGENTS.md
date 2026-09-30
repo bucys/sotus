@@ -47,6 +47,10 @@ pnpm typecheck
 # Lint
 pnpm lint
 
+# Format (Prettier; `format:check` only reports)
+pnpm format
+pnpm format:check
+
 # Database migrations (plain SQL in supabase/migrations/)
 supabase db push
 
@@ -78,8 +82,8 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`, with `rationa
 
 ## Tooling
 
-Chosen during `/audit`, installed by the `/develop tooling` sub task. Nothing below is installed yet
-except ESLint.
+Chosen during `/audit`, installed by the `/develop tooling` sub task. All of it is installed except
+Vitest, which stays deferred.
 
 - **TypeScript**: keep `strict`, and add `noUncheckedIndexedAccess`, `noImplicitOverride` and `noFallthroughCasesInSwitch`. Model output and record lookups are full of optional fields, so the index check pays for itself.
 - **Lint and format**: ESLint with `eslint-config-next` (installed) plus Prettier with `prettier-plugin-tailwindcss` so class lists stay sorted.

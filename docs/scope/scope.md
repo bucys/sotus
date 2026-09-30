@@ -14,7 +14,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | in-progress |
-| 2 | Coding standards & tooling | Foundation | planned |
+| 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | planned |
 | 4 | Design system & UI foundation | Foundation | planned |
 | 5 | Sign in | Release 1 | planned |
@@ -42,7 +42,7 @@ spec [0001](../specs/0001-stack-architecture/index.md) · code in `src/`, `supab
 ### 2. Coding standards & tooling
 Capture conventions from the real scaffold, then install lint, format, and type checks so every later feature follows them.
 **Done when:** root `AGENTS.md` reflects the real stack, and lint, format, and type checks run clean.
-- [ ] Capture conventions + tooling choices: `/audit`
+- [x] Capture conventions + tooling choices: `/audit`
 
 ### 3. Data model · needs a decision
 Users, recipes (ingredients, steps, source link, who added it), and each user's saved collection, shaped so later extras (tags, meal plans) fit without a painful migration.
