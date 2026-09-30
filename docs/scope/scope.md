@@ -37,7 +37,7 @@ spec [0001](../specs/0001-stack-architecture/index.md) · code in `src/`, `supab
 - [x] Decide the stack (spec): `/architect stack & architecture`
 - [x] Scaffold from the decision: `/develop stack & architecture`
   - [x] Gemini YouTube feasibility spike, evidence recorded in spec 0001 `rationale.md` (gates #7, not the scaffold). Ran 2026-09-27, verdict **Fail** on grounding, so #7 owes an `/architect` supersede run.
-- [ ] Verify it: `/check verify stack & architecture`
+- [x] Verify it: `/check verify stack & architecture`
 
 ### 2. Coding standards & tooling
 Capture conventions from the real scaffold, then install lint, format, and type checks so every later feature follows them.

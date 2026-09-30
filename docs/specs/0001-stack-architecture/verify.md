@@ -13,9 +13,9 @@ _Steps derived from the scope's "Done when" for feature #1 (spec 0001 is a decis
 - [x] Watch the `next dev` log while loading `/` → the line shows a `proxy.ts` timing, proving session refresh runs on the request → DW-1
 - [x] Load `/` and read `getComputedStyle(document.body).fontFamily` → it starts with `Geist`, not a serif fallback, proving the font tokens in `globals.css` resolve instead of falling back → DW-1
 - [x] Open the deployed Vercel production URL in a browser → the same page renders over HTTPS → DW-2
-- [ ] In Vercel, open the production deployment → Functions region is `fra1` → DW-2
-- [ ] In Vercel, open Settings → Environment Variables → `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL` are all present → DW-2
-- [ ] Open a pull request against `main` → Vercel posts a preview URL and that URL renders the page → DW-2
+- [x] In Vercel, open the production deployment → Functions region is `fra1` → DW-2
+- [x] In Vercel, open Settings → Environment Variables → `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL` are all present → DW-2
+- [x] Open a pull request against `main` → Vercel posts a preview URL and that URL renders the page → DW-2
 
 ## Value sourcing
 - [x] Temporarily blank `NEXT_PUBLIC_SUPABASE_URL` in `.env.local` and load `/` → a clear "Missing environment variable" error, not a silent undefined → DW-1
@@ -23,7 +23,7 @@ _Steps derived from the scope's "Done when" for feature #1 (spec 0001 is a decis
 
 ## Done-when coverage
 - DW-1 "the empty scaffold runs locally and builds clean" … covered by every Commands step, the two local UI steps and both Value sourcing steps.
-- DW-2 "live at a shareable URL" … covered by the four deployed steps. Production is live at https://sotus.vercel.app and renders over HTTPS (verified 2026-09-30); the three remaining steps need Vercel dashboard access and a pull request.
+- DW-2 "live at a shareable URL" … covered by the four deployed steps, all passing as of 2026-09-30. Production is live at https://sotus.vercel.app, renders over HTTPS, builds its functions in `fra1` and holds all four environment variables. The pull request preview also builds in `fra1` and renders the page; preview URLs sit behind Vercel Authentication, so reaching one needs `vercel curl` or a signed in browser.
 - DW-3 "the stack is recorded in a spec" … already satisfied by spec 0001 itself.
 
 ## Not covered here
