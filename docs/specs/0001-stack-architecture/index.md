@@ -42,7 +42,7 @@ Reasoning, options, and how each review finding was handled: see [rationale.md](
 | AI provider | Google Gemini Flash (exact model ID in `GEMINI_MODEL`, fixed by the spike) via `@google/genai` | Expected to read public YouTube URLs directly; cheap; structured JSON output. Paid tier (billing on) so prompts are not used for training. |
 | Link fetching | One guarded fetch helper (`safeFetch`) for every user supplied web page URL, built on `undici` so the address is checked at connect time | Stops server side request forgery (SSRF: tricking the server into calling internal addresses) and oversized downloads. See *Ingestion boundary*. New dependency: `undici`. |
 | Web page extraction | `safeFetch` the HTML, read schema.org `Recipe` JSON-LD first, fall back to Gemini on the page text; both paths pass the same acceptance contract | Most recipe sites publish structured data: free, fast and exact. Details in spec #6. |
-| YouTube extraction | Parse the video ID, rebuild the canonical `https://www.youtube.com/watch?v=<id>` URL, send only that to Gemini as file input; title and thumbnail from YouTube oEmbed | No transcript scraping, and no user supplied URL ever reaches Gemini. **The spike failed on 2026-09-27, so this row is not in force**: see *Evidence: Gemini YouTube spike* in [rationale.md](rationale.md). A separate `/architect` run supersedes it. Details in spec #7. |
+| YouTube extraction | Parse the video ID, rebuild the canonical `https://www.youtube.com/watch?v=<id>` URL, send only that to Gemini as file input; title and thumbnail from YouTube oEmbed | No transcript scraping, and no user supplied URL ever reaches Gemini. **Superseded by [0002](../0002-recipe-from-youtube-link/index.md)** after the spike failed on 2026-09-27: a text first ladder (creator page JSON-LD, description via the YouTube Data API, then a gated grounded transcript); oEmbed is dropped. |
 | Background jobs | None. Extraction runs synchronously in the Server Action under one 75 s deadline (`maxDuration = 90`) | Traffic is tiny; a queue adds a service and states with no measured need. Revisit only if the spike or real use shows the deadline is missed. |
 | AI cost guard | Atomic quota reservation in Postgres before any paid work: per user daily limits per AI operation plus one app wide daily limit; Google Cloud budget alert and spend cap | Concurrency safe, covers every AI call (extraction and #12 cook picks), and counts failures too. See *Cost guard*. |
 | File storage and images | None stored | No uploads in scope. YouTube thumbnails (`i.ytimg.com`) use `next/image` via `images.remotePatterns`; recipe site images come from unknown hosts, so they use a plain `<img>` (details in spec #6). |
@@ -61,7 +61,7 @@ Reasoning, options, and how each review finding was handled: see [rationale.md](
 - **RLS is the security boundary.** Every table has RLS on. The app uses the publishable key plus the user's session. No secret (service role) key in the app. Accounting data is written only through `SECURITY DEFINER` Postgres functions (functions that run with their owner's rights and do their own checks).
 - **Trust the server check, not the cookie.** Server code identifies the user with `supabase.auth.getUser()` (or `getClaims()`), never `getSession()` alone. Signed out visitors are redirected to sign in by the Next.js request proxy (`proxy.ts`, formerly `middleware.ts`), which also refreshes the session cookie.
 - **Web page URLs go through `safeFetch`.** No other code calls `fetch` on a user supplied web page URL.
-- **YouTube URLs take a separate guarded path.** Parse the video ID, rebuild the canonical `https://www.youtube.com/watch?v=<id>` URL, and send only that canonical URL to Gemini. The original user supplied YouTube URL is never fetched and never forwarded anywhere; oEmbed is called on the fixed `youtube.com` host with the canonical URL.
+- **YouTube URLs take a separate guarded path.** Parse the video ID, rebuild the canonical `https://www.youtube.com/watch?v=<id>` URL, and send only that canonical URL (or the bare ID) onward. The original user supplied YouTube URL is never fetched and never forwarded anywhere. The services it goes to are set by [0002](../0002-recipe-from-youtube-link/index.md) (YouTube Data API and Gemini; oEmbed dropped).
 - **Reserve before cost.** No page fetch or Gemini call starts without a successful quota reservation.
 - **Only an accepted recipe is saved.** Every source, JSON-LD or Gemini, returns one of the four outcomes in the *Acceptance contract*; only `recipe` is written, in one atomic database call.
 - **One deadline, passed everywhere.** Each extraction creates one `AbortSignal` with the 75 s deadline and passes it to every step.
@@ -79,7 +79,7 @@ One helper for user supplied web page URLs; no other code fetches them. YouTube 
 | Request hygiene | `GET` only; no cookies or auth headers forwarded; fixed `User-Agent` naming Sotus |
 | Result | Either the HTML plus the final URL, or `ingestion_failed` with a reason (`blocked_url`, `too_many_redirects`, `too_large`, `unsupported_content`, `fetch_failed`, `timeout`) |
 
-**YouTube path (separate guard):** YouTube links never pass through `safeFetch`. The video ID is parsed from the pasted link (a link with no valid ID is `ingestion_failed`, `blocked_url`), the canonical `https://www.youtube.com/watch?v=<id>` URL is rebuilt, and only that URL goes to Gemini and to oEmbed on the fixed `youtube.com` host. The original pasted URL is never fetched and never forwarded.
+**YouTube path (separate guard, superseded in detail by [0002](../0002-recipe-from-youtube-link/index.md)):** YouTube links never pass through `safeFetch` (links found in a video's description are ordinary web page URLs and do). The video ID is parsed from the pasted link (a link with no valid ID is `ingestion_failed`, `blocked_url`), the canonical `https://www.youtube.com/watch?v=<id>` URL is rebuilt, and only that URL goes to Gemini and to oEmbed on the fixed `youtube.com` host. The original pasted URL is never fetched and never forwarded.
 
 ### Acceptance contract (`src/lib/extraction/contract.ts`)
 
@@ -141,6 +141,8 @@ Acceptance rules, applied identically to JSON-LD results and Gemini results:
 - **Provider side** (initial demo billing safeguards): a Google Cloud budget alert at €5 a month, and a project spend cap at €10 a month where the account offers one. Enforcement can lag and overage is still billed, so the in app limits above are the real guard.
 
 ### Gemini YouTube feasibility spike (gates spec #7, not the scaffold)
+
+**Superseded by [0002](../0002-recipe-from-youtube-link/index.md)**, which reuses the videos, buckets, rerun cap and pass rules below for its spike 2.
 
 **Result, 2026-09-27: Fail.** The run, the manual grounding review and the verdict are recorded in [rationale.md](rationale.md) under *Evidence: Gemini YouTube spike*. Classification, speed and schema passed; grounding failed on video 2 (an invented cooking time and an invented ingredient) and shape failed on one run of video 1. The rules below stay exactly as written, because a rerun or a replacement design is judged against them.
 
@@ -259,7 +261,7 @@ The feature's "done when" is an empty scaffold that runs locally, builds clean a
 
 - [ ] Step 0, before `/develop`: create the public GitHub repo on your personal account and move the Sotus folder (docs, design, `.claude/skills/`) into it.
 - [x] Run the Gemini YouTube spike and record its evidence in `rationale.md` before spec #7 is designed. It ran on 2026-09-27 and **failed** on grounding; the evidence and verdict are in `rationale.md`.
-- [ ] Owed by the failed spike: rerun `/architect` to supersede the YouTube extraction row, before feature #7 is designed or built. Nothing else in this spec depends on that row.
+- [x] Owed by the failed spike: rerun `/architect` to supersede the YouTube extraction row. Done 2026-09-30 in [0002](../0002-recipe-from-youtube-link/index.md).
 - [ ] Revisit the quota defaults (20 / 30 / 300) and billing safeguards (€5 alert, €10 cap) after the spike and again once real usage and cost are measured; change limits with a migration.
 - [ ] Spec #3 Data model: the attempt table, `reserve_ai_attempt` and `finish_ai_attempt`, atomic recipe save (one Postgres function), and RLS policy tests.
 - [ ] Spec #6 and #7: build to the ingestion boundary, acceptance contract, schemas and deadline in this spec; #6 also decides recipe site image handling.

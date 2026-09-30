@@ -54,6 +54,12 @@ pnpm format:check
 # Database migrations (plain SQL in supabase/migrations/)
 supabase db push
 
+# Regenerate DB types after a migration
+supabase gen types typescript --linked > src/lib/supabase/database.types.ts
+
+# Prove the data model against sotus-dev (one rolled back transaction; run when today's attempt count is under 270)
+supabase db query --linked -f supabase/tests/rls.sql
+
 # Gemini YouTube feasibility spike (throwaway, needs .env.local)
 pnpm spike:gemini-youtube
 ```
@@ -72,6 +78,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`, with `rationa
 - **Server first.** Pages are Server Components. `"use client"` only for real interaction: forms with pending state, menus, motion.
 - **Secrets and env vars.** `GEMINI_API_KEY` is read only in server code, behind `import "server-only"`. Only `NEXT_PUBLIC_` variables reach the browser. Every variable is validated where it is read and throws when absent, the way [src/lib/supabase/env.ts](src/lib/supabase/env.ts) does, so a missing secret fails at boot rather than mid extraction.
 - **RLS is the security boundary.** Every table has row level security on, the app uses the publishable key plus the user's session, and no service role key. Server code identifies the user with `supabase.auth.getUser()` or `getClaims()`, never `getSession()` alone.
+- **Recipes are written only through `save_recipe`.** The caller signs the payload with `RECIPE_PUBLISH_SECRET` via [src/lib/recipes/sign-payload.ts](src/lib/recipes/sign-payload.ts) (`server-only`); the database checks it against the Vault secret `recipe_publish_secret`. The two values must match. Attempts start with `reserve_ai_attempt`; the error texts map to typed results in [src/lib/ai/attempt-reasons.ts](src/lib/ai/attempt-reasons.ts).
 - **One door for user supplied URLs.** Web page URLs go through `safeFetch` and nothing else fetches them. YouTube links take their own guarded path: parse the video id, rebuild the canonical `https://www.youtube.com/watch?v=<id>` URL, and send only that onward. The pasted URL is never fetched or forwarded.
 - **Reserve before cost, save only what passed.** No fetch or Gemini call starts without a successful quota reservation, and only an accepted recipe is written, atomically. One `AbortSignal` carries the 75 s deadline to every step.
 - **Named exports only.** Next.js route files are the exception: `page.tsx`, `layout.tsx`, `route.ts` and friends must default export.
