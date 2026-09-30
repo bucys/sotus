@@ -15,7 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | in-progress |
 | 2 | Coding standards & tooling | Foundation | done |
-| 3 | Data model | Foundation | in-progress |
+| 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | planned |
 | 5 | Sign in | Release 1 | planned |
 | 6 | Recipe from a web page link | Release 1 | planned |
@@ -44,7 +44,7 @@ Capture conventions from the real scaffold, then install lint, format, and type 
 **Done when:** root `AGENTS.md` reflects the real stack, and lint, format, and type checks run clean.
 - [x] Capture conventions + tooling choices: `/audit`
 
-### 3. Data model · in-progress
+### 3. Data model · done
 Users, recipes (ingredients, steps, source link, who added it), and each user's saved collection, shaped so later extras (tags, meal plans) fit without a painful migration.
 **Done when:** a recipe can be stored with its source and who added it, only through Sotus's signed save, any signed in user can read it, no user can change it, and a user can save and unsave any recipe in their collection.
 spec [0003](../specs/0003-data-model/index.md) · code in `supabase/migrations/`, `supabase/tests/`, `src/lib/recipes/`, `src/lib/ai/`
@@ -53,7 +53,8 @@ spec [0003](../specs/0003-data-model/index.md) · code in `supabase/migrations/`
   - [x] Schema and RPC migrations pushed to `sotus-dev`, types regenerated (AC-1 to AC-14)
   - [x] Publish secret in Vercel and Vault, `sign-payload.ts` and `attempt-reasons.ts` (AC-1, AC-3, AC-11)
   - [x] `supabase/tests/rls.sql` green, including privileges and URL keys (AC-15)
-- [ ] Verify it: `/check verify data model`
+- [x] Verify it: `/check verify data model`
+  - Deferred, non blocking for Alpha: real Google profile trigger and real account deletion (feature #5), UTC day boundary rollover, Vault secret mismatch, live tracking parameter saves. Listed in `docs/specs/0003-data-model/verify.md`.
 
 ### 4. Design system & UI foundation · needs a decision
 Colors, type, spacing, and base components for a warm, mobile first kitchen feel (the earlier "Sodrus" direction in the Vault is a starting input, not a lock).

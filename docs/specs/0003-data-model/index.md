@@ -1,7 +1,7 @@
 # 0003. Data model: shared recipes, private collections, signed publication
 
 **Date**: 2026-09-30
-**Status**: In Progress
+**Status**: Accepted
 
 Builds the tables, functions and policies that [0001](../0001-stack-architecture/index.md) (attempt table, quota functions, atomic save) and [0002](../0002-recipe-from-youtube-link/index.md) (YouTube columns, save RPC with attempt ID) asked #3 to design. Where this spec and 0002 once differed (duplicate handling, `extraction_method` values, the save call), this spec is the source and 0002 has been updated to match.
 
