@@ -36,7 +36,7 @@ Decide the web stack, hosting, sign in approach, and AI provider, then scaffold 
 spec [0001](../specs/0001-stack-architecture/index.md) · code in `src/`, `supabase/`, `scripts/`
 - [x] Decide the stack (spec): `/architect stack & architecture`
 - [x] Scaffold from the decision: `/develop stack & architecture`
-  - [ ] Gemini YouTube feasibility spike, evidence recorded in spec 0001 `rationale.md` (gates #7, not the scaffold)
+  - [x] Gemini YouTube feasibility spike, evidence recorded in spec 0001 `rationale.md` (gates #7, not the scaffold). Ran 2026-09-27, verdict **Fail** on grounding, so #7 owes an `/architect` supersede run.
 - [ ] Verify it: `/check verify stack & architecture`
 
 ### 2. Coding standards & tooling

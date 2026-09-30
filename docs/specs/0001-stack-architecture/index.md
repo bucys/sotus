@@ -42,7 +42,7 @@ Reasoning, options, and how each review finding was handled: see [rationale.md](
 | AI provider | Google Gemini Flash (exact model ID in `GEMINI_MODEL`, fixed by the spike) via `@google/genai` | Expected to read public YouTube URLs directly; cheap; structured JSON output. Paid tier (billing on) so prompts are not used for training. |
 | Link fetching | One guarded fetch helper (`safeFetch`) for every user supplied web page URL, built on `undici` so the address is checked at connect time | Stops server side request forgery (SSRF: tricking the server into calling internal addresses) and oversized downloads. See *Ingestion boundary*. New dependency: `undici`. |
 | Web page extraction | `safeFetch` the HTML, read schema.org `Recipe` JSON-LD first, fall back to Gemini on the page text; both paths pass the same acceptance contract | Most recipe sites publish structured data: free, fast and exact. Details in spec #6. |
-| YouTube extraction | Parse the video ID, rebuild the canonical `https://www.youtube.com/watch?v=<id>` URL, send only that to Gemini as file input; title and thumbnail from YouTube oEmbed | No transcript scraping, and no user supplied URL ever reaches Gemini. **Gated by the spike.** Details in spec #7. |
+| YouTube extraction | Parse the video ID, rebuild the canonical `https://www.youtube.com/watch?v=<id>` URL, send only that to Gemini as file input; title and thumbnail from YouTube oEmbed | No transcript scraping, and no user supplied URL ever reaches Gemini. **The spike failed on 2026-09-27, so this row is not in force**: see *Evidence: Gemini YouTube spike* in [rationale.md](rationale.md). A separate `/architect` run supersedes it. Details in spec #7. |
 | Background jobs | None. Extraction runs synchronously in the Server Action under one 75 s deadline (`maxDuration = 90`) | Traffic is tiny; a queue adds a service and states with no measured need. Revisit only if the spike or real use shows the deadline is missed. |
 | AI cost guard | Atomic quota reservation in Postgres before any paid work: per user daily limits per AI operation plus one app wide daily limit; Google Cloud budget alert and spend cap | Concurrency safe, covers every AI call (extraction and #12 cook picks), and counts failures too. See *Cost guard*. |
 | File storage and images | None stored | No uploads in scope. YouTube thumbnails (`i.ytimg.com`) use `next/image` via `images.remotePatterns`; recipe site images come from unknown hosts, so they use a plain `<img>` (details in spec #6). |
@@ -141,6 +141,8 @@ Acceptance rules, applied identically to JSON-LD results and Gemini results:
 - **Provider side** (initial demo billing safeguards): a Google Cloud budget alert at €5 a month, and a project spend cap at €10 a month where the account offers one. Enforcement can lag and overage is still billed, so the in app limits above are the real guard.
 
 ### Gemini YouTube feasibility spike (gates spec #7, not the scaffold)
+
+**Result, 2026-09-27: Fail.** The run, the manual grounding review and the verdict are recorded in [rationale.md](rationale.md) under *Evidence: Gemini YouTube spike*. Classification, speed and schema passed; grounding failed on video 2 (an invented cooking time and an invented ingredient) and shape failed on one run of video 1. The rules below stay exactly as written, because a rerun or a replacement design is judged against them.
 
 A throwaway script, `scripts/spike-gemini-youtube.ts`, run locally against the paid tier key and the exact model ID intended for `GEMINI_MODEL`, using the real provider schema and prompt.
 
@@ -256,7 +258,8 @@ The feature's "done when" is an empty scaffold that runs locally, builds clean a
 ## Follow-up
 
 - [ ] Step 0, before `/develop`: create the public GitHub repo on your personal account and move the Sotus folder (docs, design, `.claude/skills/`) into it.
-- [ ] Run the Gemini YouTube spike and record its evidence in `rationale.md` before spec #7 is designed.
+- [x] Run the Gemini YouTube spike and record its evidence in `rationale.md` before spec #7 is designed. It ran on 2026-09-27 and **failed** on grounding; the evidence and verdict are in `rationale.md`.
+- [ ] Owed by the failed spike: rerun `/architect` to supersede the YouTube extraction row, before feature #7 is designed or built. Nothing else in this spec depends on that row.
 - [ ] Revisit the quota defaults (20 / 30 / 300) and billing safeguards (€5 alert, €10 cap) after the spike and again once real usage and cost are measured; change limits with a migration.
 - [ ] Spec #3 Data model: the attempt table, `reserve_ai_attempt` and `finish_ai_attempt`, atomic recipe save (one Postgres function), and RLS policy tests.
 - [ ] Spec #6 and #7: build to the ingestion boundary, acceptance contract, schemas and deadline in this spec; #6 also decides recipe site image handling.
@@ -265,6 +268,6 @@ The feature's "done when" is an empty scaffold that runs locally, builds clean a
 - [ ] No project `AGENTS.md` exists yet. When `/audit` (feature #2) creates it, list in `## Agent skills` (all project wide, root level): the user level `supabase` and `supabase-postgres-best-practices`, plus the project skills installed on 2026-09-27 in `.claude/skills/` (`vercel-react-best-practices`, `vercel-composition-patterns`, `deploy-to-vercel`, `vercel-cli-with-tokens`, `next-dev-loop`, `shadcn`). `MCP servers:` Vercel MCP, Next.js devtools MCP. `Declined:` Tailwind v4 docs and zod community skills, shadcn community MCP.
 - [ ] In the new repo, check `.claude/skills/` is not ignored by git so the installed skills travel with the code.
 - [ ] Before a demo: wake the `sotus-dev` Supabase project (it pauses when idle).
-- [ ] `scripts/spike-gemini-youtube.ts` does not yet match the spike rules above: it has no `too_slow` bucket (a call cut off at 55 s lands in `error`) and no rerun top up for a video short of 3 completed runs. Fix both, and add a way to rerun one video alone, before the next spike run.
+- [x] `scripts/spike-gemini-youtube.ts` now matches the spike rules above: it has a `too_slow` bucket, a rerun top up capped at 2, and it takes video ids as arguments so one video can be rerun alone. The 2026-09-27 run used this version, so its `too_slow` and rerun counts can be trusted.
 - [ ] Spec #7 must handle links the spike does not cover: a very long video, a non English video, and a private, deleted or region blocked link. The spike answers whether Gemini can read a video at all, not whether it survives arbitrary user links.
 - [ ] Split into `sotus-dev` and `sotus-prod` once Sotus holds recipes worth keeping. Needs a second Supabase organization or a paused project, then a second OAuth client, a second redirect allow list and every migration pushed twice. Until this is done, treat `sotus-dev` as the only Supabase project and do not create another.

@@ -100,3 +100,83 @@ An independent review raised six findings after the first draft. Each was weighe
 - An automated wake up for the idle Supabase project (you chose manual).
 - Refunding quota for failures caused by the provider: simpler to count every attempt at this scale.
 
+
+## Evidence: Gemini YouTube spike (2026-09-27)
+
+The spike ran as [index.md](index.md) specifies under *Gemini YouTube feasibility spike*: five videos, one per failure mode, three completed runs each, through `scripts/spike-gemini-youtube.ts` with the real provider schema and prompt.
+
+### Run configuration
+
+| Setting | Value | Where it comes from |
+|---|---|---|
+| Videos | The five in `scripts/spike-gemini-youtube.ts` | the script |
+| Runs per video | 3, rerun cap 2 | the script (`RUNS_PER_VIDEO`, `MAX_RERUNS`) |
+| Step deadline | 55 s per call | the script (`STEP_BUDGET_MS`) |
+| Media resolution | `MEDIA_RESOLUTION_LOW` | the script (`MEDIA_RESOLUTION`) |
+| Thinking budget | 0 | the script (`THINKING_BUDGET`) |
+| Provider schema | Accepted, never rejected | the run |
+
+Not captured in this run, and still owed before any rerun: the exact model ID and API version used, per call latency for every call (only the maximum was noted), input and output token counts, cost per call at the paid tier rate published that day, and the observed quotas and input limits (longest video accepted). None of them change the verdict below, which fails on grounding, but a rerun needs them.
+
+### What the run returned
+
+| # | Video | Expected | Returned | Shape | Grounding |
+|---|---|---|---|---|---|
+| 1 | Long cooking video, recipe spoken | `recipe` | `recipe` 3/3 | **Run 3 failed**: 18 ingredients, 0 steps | **Pass** |
+| 2 | Short, recipe spoken or on screen | `recipe` | `recipe` 3/3, no quantities in the latest run | Pass | **Fail** |
+| 3 | Cooking demonstration, nothing spoken or written | `recipe` | `recipe` 3/3, no quantities in the latest run | Pass | Not reviewed by hand |
+| 4 | Food vlog, nothing to cook from | `insufficient` | `insufficient` 3/3 | not applicable | not applicable |
+| 5 | Non food video | `not_a_recipe` | `not_a_recipe` 3/3 | not applicable | not applicable |
+
+Call buckets across the whole matrix: 0 `transient`, 0 `too_slow`, 0 `error`. Every video reached 3 completed runs with no rerun needed. Maximum latency was about 7 s against the 55 s step deadline, so speed was never close to a problem.
+
+Read that 0 transient count beside the earlier run already recorded in [index.md](index.md) (*the transient rate is evidence, not background*), where run 2 lost 5 of 12 calls to 503. The rate moves between days, so spec #7 still designs for a provider that is sometimes unavailable. One clean day is not a promise.
+
+### Manual grounding review
+
+Checked by hand against the source, following the manual grounding check in [index.md](index.md).
+
+**Video 1: pass.** The main ingredients match the source. The quantities match. The times and temperatures match. Nothing meaningful was invented.
+
+**Video 2: fail.** Classification as `recipe` was right, and most ingredients were identified correctly. The temperature was grounded from the video or its description. Three things then broke the check:
+
+- A concrete cooking time was invented. The source gave only an internal meat temperature, so the time came from the model, not the video.
+- Mustard was reported and is not in the source. It looks inferred from the color of the glaze.
+- White miso was missed, and it is a main ingredient by the rule, because it changes what the dish is.
+
+Chilli is uncertain: some flakes or leaves were visible but not confidently identifiable, so it counts neither for nor against.
+
+The result is structurally valid and reads like a real recipe. That is what makes it dangerous: from the output alone, nothing looks wrong.
+
+### The pass rules applied
+
+| Rule | Result |
+|---|---|
+| Classification: videos 1, 2 and 3 return `recipe` in at least 2 of 3 completed runs; 4 and 5 never return `recipe` | **Pass**, 15 of 15 runs on the expected outcome |
+| Grounding: every `recipe` run passes the manual check | **Fail**, video 2 |
+| Shape: every `recipe` run has a non blank title, at least 2 ingredients and at least 1 step | **Fail**, video 1 run 3 returned 0 steps |
+| Speed: no `too_slow` calls | **Pass** |
+| Schema: the provider accepts the restricted response schema | **Pass** |
+
+### Verdict: Fail
+
+Applying the outcome list in [index.md](index.md) in precedence order, the first match is outcome 1: *a recipe video fails grounding on video 1 or 2*. Video 2 invented a cooking time and an ingredient, so the spike fails.
+
+Two details make this the correct reading rather than a harsh one:
+
+- Video 2 is a case where the recipe is stated in the video. An invented time and an invented ingredient there mean the model filled gaps from appearance instead of reading the source, which is exactly what outcome 1 exists to catch.
+- Outcome 2 (*pass with amounts dropped from video*) does not apply. It covers a grounding failure on video 3 alone, and this failure is on video 2. It is also not only about amounts: mustard is a whole ingredient that was never there, and dropping quantities would not remove it.
+
+The shape failure on video 1 run 3 (18 ingredients, 0 steps) breaks the Shape rule on its own, so even without the grounding failure this run would not be a clean pass.
+
+Classification is the strong result and is worth carrying forward: every one of the 15 completed runs landed on the expected outcome, including `insufficient` 3/3 on the food vlog and `not_a_recipe` 3/3 on the non food video. Gemini tells these three cases apart reliably. What it did not do is stay inside the source when it writes the recipe out.
+
+### What this means for feature #7
+
+Following *On Fail* in [index.md](index.md). Feature #7 is not redesigned here; that is a separate `/architect` run.
+
+- Do not build feature #7 on Gemini video as this spec specifies it. The YouTube extraction row is now a closed conditional that failed, not a live decision.
+- A `/architect` run owes the supersede of that row. The fallback this spec names is the video description through the YouTube Data API plus text extraction, which can be grounded against real text. Treat it as that run's starting point, not as a decision made here.
+- Feature #6 (recipe from a web page link) is unaffected. It never depended on this spike, and text sources keep the grounding check.
+- Three findings carry into whatever replaces the row: classification is reliable, latency sits far inside budget, and the invented values come from the writing step rather than the watching step. So the direction the evidence points is an approach that gives the model real text to ground against, or that drops any field it cannot ground.
+- The demo story changes, as Consequences warned it would. Better to say so now than at the demo.
