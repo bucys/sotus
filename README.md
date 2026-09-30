@@ -39,3 +39,5 @@ scripts/            throwaway spikes
 ```
 
 Durable product background lives in the Vault at `AI_VAULT/02-Projects/Sotus/`.
+
+Preview deployment verification.
