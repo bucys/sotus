@@ -15,11 +15,11 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | in-progress |
 | 2 | Coding standards & tooling | Foundation | done |
-| 3 | Data model | Foundation | planned |
+| 3 | Data model | Foundation | in-progress |
 | 4 | Design system & UI foundation | Foundation | planned |
 | 5 | Sign in | Release 1 | planned |
 | 6 | Recipe from a web page link | Release 1 | planned |
-| 7 | Recipe from a YouTube link | Release 1 | planned |
+| 7 | Recipe from a YouTube link | Release 1 | in-progress |
 | 8 | Recipe page | Release 1 | planned |
 | 9 | Shared recipe library | Release 1 | planned |
 | 10 | Extraction error tracking | Release 1 | planned |
@@ -36,7 +36,7 @@ Decide the web stack, hosting, sign in approach, and AI provider, then scaffold 
 spec [0001](../specs/0001-stack-architecture/index.md) · code in `src/`, `supabase/`, `scripts/`
 - [x] Decide the stack (spec): `/architect stack & architecture`
 - [x] Scaffold from the decision: `/develop stack & architecture`
-  - [x] Gemini YouTube feasibility spike, evidence recorded in spec 0001 `rationale.md` (gates #7, not the scaffold). Ran 2026-09-27, verdict **Fail** on grounding, so #7 owes an `/architect` supersede run.
+  - [x] Gemini YouTube feasibility spike, evidence recorded in spec 0001 `rationale.md` (gates #7, not the scaffold). Ran 2026-09-27, verdict **Fail** on grounding; superseded for #7 by spec [0002](../specs/0002-recipe-from-youtube-link/index.md).
 - [ ] Verify it: `/check verify stack & architecture`
 
 ### 2. Coding standards & tooling
@@ -44,10 +44,16 @@ Capture conventions from the real scaffold, then install lint, format, and type 
 **Done when:** root `AGENTS.md` reflects the real stack, and lint, format, and type checks run clean.
 - [x] Capture conventions + tooling choices: `/audit`
 
-### 3. Data model · needs a decision
+### 3. Data model · in-progress
 Users, recipes (ingredients, steps, source link, who added it), and each user's saved collection, shaped so later extras (tags, meal plans) fit without a painful migration.
-**Done when:** a recipe can be stored with its source and owner, any signed in user can read it, only its owner can change it, and a user can save any recipe to their collection.
-- [ ] Design it (spec): `/architect data model`
+**Done when:** a recipe can be stored with its source and who added it, only through Sotus's signed save, any signed in user can read it, no user can change it, and a user can save and unsave any recipe in their collection.
+spec [0003](../specs/0003-data-model/index.md) · code in `supabase/migrations/`, `supabase/tests/`, `src/lib/recipes/`, `src/lib/ai/`
+- [x] Design it (spec): `/architect data model`
+- [x] Build it: `/develop data model`
+  - [x] Schema and RPC migrations pushed to `sotus-dev`, types regenerated (AC-1 to AC-14)
+  - [x] Publish secret in Vercel and Vault, `sign-payload.ts` and `attempt-reasons.ts` (AC-1, AC-3, AC-11)
+  - [x] `supabase/tests/rls.sql` green, including privileges and URL keys (AC-15)
+- [ ] Verify it: `/check verify data model`
 
 ### 4. Design system & UI foundation · needs a decision
 Colors, type, spacing, and base components for a warm, mobile first kitchen feel (the earlier "Sodrus" direction in the Vault is a starting input, not a lock).
@@ -68,10 +74,18 @@ Paste a recipe page link and get a structured recipe (title, ingredients with am
 **Done when:** pasting a typical recipe page link produces a saved recipe with ingredients and steps in under a minute, and a non recipe or broken link shows a clear message.
 - [ ] Design it (spec): `/architect recipe from a web page link`
 
-### 7. Recipe from a YouTube link · needs a decision
+### 7. Recipe from a YouTube link · in-progress
 Paste a YouTube video or Short and get the same structured recipe, so the recipe is no longer buried in the video. The headline demo moment.
 **Done when:** pasting a YouTube cooking video or Short produces a saved recipe linked to the video; a video with no usable recipe content shows a clear message instead of a made up recipe.
-- [ ] Design it (spec): `/architect recipe from a youtube link`
+spec [0002](../specs/0002-recipe-from-youtube-link/index.md) · builds after #3 and #6
+- [x] Design it (spec): `/architect recipe from a youtube link`
+- [ ] Build it: `/develop recipe from a youtube link`
+  - [ ] Slice 1 foundations: YouTube key, link parsing and routing, duplicate check, Data API metadata (AC-1, AC-2, AC-3, AC-8, AC-13)
+  - [ ] Slice 1 extraction: grounding, creator page, description step, orchestration and save (AC-4 to AC-7, AC-9, AC-11, AC-12)
+  - [ ] Slice 1 UI: pending state, messages, provenance line and notice (AC-10)
+  - [ ] Spike 2: grounded transcript on the five videos, evidence in spec 0002 (gates slice 2)
+  - [ ] Slice 2: grounded transcript step, only if spike 2 passes (AC-14 to AC-16)
+- [ ] Verify it: `/check verify recipe from a youtube link`
 
 ### 8. Recipe page
 One readable, cook friendly view of a recipe: ingredients, steps, source link, who added it.
@@ -130,6 +144,9 @@ Out of scope for the demo, kept so the plan stays honest.
 - **Public landing page with SEO**
 - **Usage analytics** · needs a decision
 - **Privacy and terms page**
+- **YouTube API data policy check**: confirm how long video titles and channel names may be stored before any public launch · from spec 0002
+- **YouTube metadata refresh or clear job**: refresh or clear `source_title` / `source_channel_title` past the allowed age, using `source_metadata_fetched_at`; launch gate · from spec 0003
+- **Admin fix path for canonical recipes**: correct, re-extract or remove a library recipe (users can't); launch gate · from spec 0003 · needs a decision
 
 ## Legend
 
