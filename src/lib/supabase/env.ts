@@ -1,6 +1,8 @@
 function required(name: string, value: string | undefined) {
   if (!value) {
-    throw new Error(`Missing environment variable ${name}. Copy .env.example to .env.local and fill it in.`);
+    throw new Error(
+      `Missing environment variable ${name}. Copy .env.example to .env.local and fill it in.`,
+    );
   }
   return value;
 }

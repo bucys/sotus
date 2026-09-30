@@ -88,8 +88,14 @@ const PROMPT = [
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
-    outcome: { type: "string", enum: ["recipe", "not_a_recipe", "insufficient"] },
-    reason: { type: "string", description: "Why, when the outcome is not recipe." },
+    outcome: {
+      type: "string",
+      enum: ["recipe", "not_a_recipe", "insufficient"],
+    },
+    reason: {
+      type: "string",
+      description: "Why, when the outcome is not recipe.",
+    },
     title: { type: "string" },
     ingredients: {
       type: "array",
@@ -97,8 +103,14 @@ const RESPONSE_SCHEMA = {
         type: "object",
         properties: {
           name: { type: "string" },
-          quantity: { type: "string", description: "Empty when the video does not state it." },
-          unit: { type: "string", description: "Empty when the video does not state it." },
+          quantity: {
+            type: "string",
+            description: "Empty when the video does not state it.",
+          },
+          unit: {
+            type: "string",
+            description: "Empty when the video does not state it.",
+          },
         },
         required: ["name"],
       },
@@ -139,9 +151,15 @@ function isStructurallyValid(parsed: ParsedResult) {
   if (parsed.outcome !== "recipe") {
     return true;
   }
-  const namedIngredients = (parsed.ingredients ?? []).filter((ingredient) => ingredient.name?.trim());
+  const namedIngredients = (parsed.ingredients ?? []).filter((ingredient) =>
+    ingredient.name?.trim(),
+  );
   const realSteps = (parsed.steps ?? []).filter((step) => step.trim());
-  return Boolean(parsed.title?.trim()) && namedIngredients.length >= 2 && realSteps.length >= 1;
+  return (
+    Boolean(parsed.title?.trim()) &&
+    namedIngredients.length >= 2 &&
+    realSteps.length >= 1
+  );
 }
 
 /**
@@ -156,7 +174,9 @@ function isTransient(error: unknown) {
     return true;
   }
   const message = error instanceof Error ? error.message : String(error);
-  return /\b(429|500|503)\b|UNAVAILABLE|overloaded|high demand|RESOURCE_EXHAUSTED/i.test(message);
+  return /\b(429|500|503)\b|UNAVAILABLE|overloaded|high demand|RESOURCE_EXHAUSTED/i.test(
+    message,
+  );
 }
 
 /**
@@ -179,7 +199,8 @@ function videoIdOf(input: string) {
   const id =
     url.hostname === "youtu.be"
       ? url.pathname.slice(1)
-      : (url.searchParams.get("v") ?? url.pathname.split("/").filter(Boolean).pop());
+      : (url.searchParams.get("v") ??
+        url.pathname.split("/").filter(Boolean).pop());
   if (!id || !/^[\w-]{11}$/.test(id)) {
     throw new Error(`No valid YouTube video id in ${input}`);
   }
@@ -218,7 +239,11 @@ async function runOnce(ai: GoogleGenAI, model: string, videoUrl: string) {
   };
 }
 
-async function runWithOneRetry(ai: GoogleGenAI, model: string, videoUrl: string): Promise<RunRecord> {
+async function runWithOneRetry(
+  ai: GoogleGenAI,
+  model: string,
+  videoUrl: string,
+): Promise<RunRecord> {
   for (const attempt of [1, 2]) {
     const startedAt = Date.now();
     try {
@@ -242,7 +267,9 @@ async function runWithOneRetry(ai: GoogleGenAI, model: string, videoUrl: string)
 }
 
 function amountOf(ingredient: { quantity?: string; unit?: string }) {
-  return [ingredient.quantity?.trim(), ingredient.unit?.trim()].filter(Boolean).join(" ");
+  return [ingredient.quantity?.trim(), ingredient.unit?.trim()]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
@@ -254,7 +281,10 @@ function amountOf(ingredient: { quantity?: string; unit?: string }) {
  */
 function reportGroundingVariance(records: RunRecord[]) {
   const recipes = records
-    .filter((record): record is Extract<RunRecord, { kind: "ok" }> => record.kind === "ok")
+    .filter(
+      (record): record is Extract<RunRecord, { kind: "ok" }> =>
+        record.kind === "ok",
+    )
     .map((record) => record.parsed)
     .filter((parsed) => parsed.outcome === "recipe");
 
@@ -268,12 +298,16 @@ function reportGroundingVariance(records: RunRecord[]) {
     for (const ingredient of parsed.ingredients ?? []) {
       const name = ingredient.name?.trim().toLowerCase();
       if (!name) continue;
-      amountsByIngredient.set(name, [...(amountsByIngredient.get(name) ?? []), amountOf(ingredient)]);
+      amountsByIngredient.set(name, [
+        ...(amountsByIngredient.get(name) ?? []),
+        amountOf(ingredient),
+      ]);
     }
   }
 
   const unstable = [...amountsByIngredient.entries()].filter(
-    ([, amounts]) => amounts.length < recipes.length || new Set(amounts).size > 1,
+    ([, amounts]) =>
+      amounts.length < recipes.length || new Set(amounts).size > 1,
   );
 
   if (unstable.length === 0) {
@@ -281,7 +315,9 @@ function reportGroundingVariance(records: RunRecord[]) {
     return;
   }
 
-  console.log(`    grounding: ${unstable.length} unstable of ${amountsByIngredient.size} ingredients`);
+  console.log(
+    `    grounding: ${unstable.length} unstable of ${amountsByIngredient.size} ingredients`,
+  );
   for (const [name, amounts] of unstable) {
     const seen = amounts.map((amount) => (amount === "" ? "(none)" : amount));
     const absentIn = recipes.length - amounts.length;
@@ -297,13 +333,20 @@ function reportVideoSummary(
   inconclusive: boolean,
 ) {
   const completed = records.filter(
-    (record): record is Extract<RunRecord, { kind: "ok" }> => record.kind === "ok",
+    (record): record is Extract<RunRecord, { kind: "ok" }> =>
+      record.kind === "ok",
   );
-  const transient = records.filter((record) => record.kind === "transient").length;
+  const transient = records.filter(
+    (record) => record.kind === "transient",
+  ).length;
   const tooSlow = records.filter((record) => record.kind === "too_slow").length;
   const errored = records.filter((record) => record.kind === "error").length;
-  const matched = completed.filter((record) => record.parsed.outcome === expected).length;
-  const valid = completed.filter((record) => isStructurallyValid(record.parsed)).length;
+  const matched = completed.filter(
+    (record) => record.parsed.outcome === expected,
+  ).length;
+  const valid = completed.filter((record) =>
+    isStructurallyValid(record.parsed),
+  ).length;
 
   console.log(
     [
@@ -320,11 +363,15 @@ function reportVideoSummary(
   if (inconclusive) {
     console.log(
       `    INCONCLUSIVE: only ${completed.length} of ${RUNS_PER_VIDEO} runs completed after ${MAX_RERUNS} reruns` +
-        (expected === "recipe" ? " · spec 0001 counts this as a fail for a recipe video" : ""),
+        (expected === "recipe"
+          ? " · spec 0001 counts this as a fail for a recipe video"
+          : ""),
     );
   }
   if (tooSlow > 0) {
-    console.log(`    TOO_SLOW x${tooSlow}: spec 0001 fails the spike on any too_slow call`);
+    console.log(
+      `    TOO_SLOW x${tooSlow}: spec 0001 fails the spike on any too_slow call`,
+    );
   }
 
   if (expected === "recipe") {
@@ -334,7 +381,9 @@ function reportVideoSummary(
 
 function logRun(runNumber: number, expected: Outcome, record: RunRecord) {
   if (record.kind === "transient") {
-    console.log(`  run ${runNumber} · TRANSIENT after 1 retry · ${record.message}`);
+    console.log(
+      `  run ${runNumber} · TRANSIENT after 1 retry · ${record.message}`,
+    );
     return;
   }
   if (record.kind === "too_slow") {
@@ -385,10 +434,13 @@ type Video = (typeof VIDEOS)[number];
  */
 async function runVideo(ai: GoogleGenAI, model: string, video: Video) {
   const canonical = canonicalYouTubeUrl(video.url);
-  console.log(`\n=== ${video.label} (expected ${video.expected})\n    ${canonical}`);
+  console.log(
+    `\n=== ${video.label} (expected ${video.expected})\n    ${canonical}`,
+  );
 
   const records: RunRecord[] = [];
-  const completedCount = () => records.filter((record) => record.kind === "ok").length;
+  const completedCount = () =>
+    records.filter((record) => record.kind === "ok").length;
   let runNumber = 0;
 
   const takeRuns = async (count: number) => {
@@ -406,14 +458,21 @@ async function runVideo(ai: GoogleGenAI, model: string, video: Video) {
   while (completedCount() < RUNS_PER_VIDEO && reruns < MAX_RERUNS) {
     reruns += 1;
     const shortfall = RUNS_PER_VIDEO - completedCount();
-    console.log(`  rerun ${reruns}/${MAX_RERUNS} · ${shortfall} more completed run(s) needed`);
+    console.log(
+      `  rerun ${reruns}/${MAX_RERUNS} · ${shortfall} more completed run(s) needed`,
+    );
     await takeRuns(shortfall);
   }
 
   const inconclusive = completedCount() < RUNS_PER_VIDEO;
   reportVideoSummary(video.expected, records, reruns, inconclusive);
 
-  return { label: video.label, expected: video.expected, records, inconclusive };
+  return {
+    label: video.label,
+    expected: video.expected,
+    records,
+    inconclusive,
+  };
 }
 
 /**
@@ -446,7 +505,9 @@ function selectVideos(argv: string[]) {
   if (selected.length === 0) {
     throw new Error(
       `No video matched "${needles.join(" ")}". Use a number 1 to ${VIDEOS.length}, a video id, or a word from a label:\n` +
-        VIDEOS.map((video, index) => `  ${index + 1}. ${video.label}`).join("\n"),
+        VIDEOS.map((video, index) => `  ${index + 1}. ${video.label}`).join(
+          "\n",
+        ),
     );
   }
   return selected;
@@ -485,15 +546,25 @@ async function main() {
 
   const inconclusive = results.filter((result) => result.inconclusive);
   const tooSlow = results.reduce(
-    (total, result) => total + result.records.filter((record) => record.kind === "too_slow").length,
+    (total, result) =>
+      total +
+      result.records.filter((record) => record.kind === "too_slow").length,
     0,
   );
 
-  console.log("\nA run passes only when outcomeMatch and validRecipe are both true.");
-  console.log("Then read the grounding lines: an unstable amount is an amount the model invented.");
-  console.log("A stable amount can still be invented, so do the manual grounding check in spec 0001.");
+  console.log(
+    "\nA run passes only when outcomeMatch and validRecipe are both true.",
+  );
+  console.log(
+    "Then read the grounding lines: an unstable amount is an amount the model invented.",
+  );
+  console.log(
+    "A stable amount can still be invented, so do the manual grounding check in spec 0001.",
+  );
   if (tooSlow > 0) {
-    console.log(`too_slow calls: ${tooSlow} · spec 0001 fails the spike on any too_slow call.`);
+    console.log(
+      `too_slow calls: ${tooSlow} · spec 0001 fails the spike on any too_slow call.`,
+    );
   }
   if (inconclusive.length > 0) {
     console.log(
@@ -501,7 +572,9 @@ async function main() {
         .map((result) => result.label)
         .join(", ")}`,
     );
-    console.log("Rerun one on its own once the provider settles, e.g. pnpm spike:gemini-youtube -- 3");
+    console.log(
+      "Rerun one on its own once the provider settles, e.g. pnpm spike:gemini-youtube -- 3",
+    );
   }
 }
 

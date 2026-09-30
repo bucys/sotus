@@ -19,12 +19,12 @@ cp .env.example .env.local   # then fill in the values
 pnpm dev
 ```
 
-| Script | What it does |
-|---|---|
-| `pnpm dev` | Dev server on http://localhost:3000 |
-| `pnpm build` | Production build |
-| `pnpm typecheck` | TypeScript, no emit |
-| `pnpm lint` | ESLint |
+| Script                      | What it does                            |
+| --------------------------- | --------------------------------------- |
+| `pnpm dev`                  | Dev server on http://localhost:3000     |
+| `pnpm build`                | Production build                        |
+| `pnpm typecheck`            | TypeScript, no emit                     |
+| `pnpm lint`                 | ESLint                                  |
 | `pnpm spike:gemini-youtube` | One off feasibility spike for spec 0001 |
 
 ## Layout
@@ -39,3 +39,7 @@ scripts/            throwaway spikes
 ```
 
 Durable product background lives in the Vault at `AI_VAULT/02-Projects/Sotus/`.
+<<<<<<< Updated upstream
+=======
+
+> > > > > > > Stashed changes

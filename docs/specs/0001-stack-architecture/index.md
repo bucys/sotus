@@ -30,7 +30,7 @@ Reasoning, options, and how each review finding was handled: see [rationale.md](
 | Runtime | Node.js 24 LTS (long term support) on Vercel, Fluid compute on | Current LTS; set in `package.json` `engines` and Vercel project settings so local and deploy match. |
 | Framework | Next.js, latest stable (16.x), App Router, Turbopack | Your default; Server Components keep pages light on phones. |
 | Styling | Tailwind CSS v4 | Your default; tokens come from spec #4 Design system. |
-| UI components | shadcn/ui (copied in components built on Radix), initialized with the default preset and CSS variables on | Accessible dialogs, menus and focus handling out of the box; you own and restyle the code. Spec #4 replaces the neutral default tokens. |
+| UI components | shadcn/ui (copied in components built on Radix), initialized with the `radix-nova` style, `neutral` base color, CSS variables on and `lucide` icons (as set in `components.json`) | Accessible dialogs, menus and focus handling out of the box; you own and restyle the code. Spec #4 replaces the neutral default tokens. |
 | Motion and icons | Framer Motion, lucide-react | Your default; use sparingly. |
 | Package manager | pnpm, version pinned with the `packageManager` field (corepack) | Fast, strict about missing dependencies, native on Vercel; the pin makes local and Vercel builds use the same pnpm. Commit `pnpm-lock.yaml`. |
 | Primary database | Supabase Postgres | Recipes, owners and collections are relational; row level security matches "everyone reads, only the owner edits". |
@@ -227,7 +227,7 @@ Quota limits are not env vars (see *Cost guard*). Set up with the Gemini key dur
 
 ### Scaffold scope (for `/develop stack & architecture`)
 
-The feature's "done when" is an empty scaffold that runs locally, builds clean and is live at a shareable URL. So the scaffold covers: the new repo, the Next.js app with the stack above installed and configured, shadcn/ui initialized (defaults, CSS variables), the Supabase clients and `proxy.ts` wired to the one `sotus-dev` project, the empty `supabase/migrations/` folder, `.env.example`, Gemini billing and caps, and the Vercel project (region `fra1`) with its environment variables set. The Gemini YouTube spike runs alongside it. The scaffold does **not** build sign in or configure Google OAuth (#5), tables or the quota functions (#3), `safeFetch` and extraction (#6, #7), or the design system (#4). Those features build to the rules in this spec.
+The feature's "done when" is an empty scaffold that runs locally, builds clean and is live at a shareable URL. So the scaffold covers: the new repo, the Next.js app with the stack above installed and configured, shadcn/ui initialized (`radix-nova` style, `neutral` base color, CSS variables), the Supabase clients and `proxy.ts` wired to the one `sotus-dev` project, the empty `supabase/migrations/` folder, `.env.example`, Gemini billing and caps, and the Vercel project (region `fra1`) with its environment variables set. The Gemini YouTube spike runs alongside it. The scaffold does **not** build sign in or configure Google OAuth (#5), tables or the quota functions (#3), `safeFetch` and extraction (#6, #7), or the design system (#4). Those features build to the rules in this spec.
 
 ## Consequences
 
