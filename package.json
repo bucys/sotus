@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "spike:gemini-youtube": "node --experimental-strip-types --env-file=.env.local scripts/spike-gemini-youtube.ts"
+    "spike:gemini-youtube": "node --experimental-strip-types --env-file=.env.local scripts/spike-gemini-youtube.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
@@ -32,6 +35,10 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
