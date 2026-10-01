@@ -6,7 +6,7 @@ import { Slot } from "radix-ui"
 import { Spinner } from "@/components/ui/spinner"
 
 const buttonVariants = cva(
-  "group/button type-label inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent bg-clip-padding transition-colors duration-150 ease-out outline-none select-none motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
+  "group/button type-label inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent bg-clip-padding transition-colors duration-150 ease-out select-none motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
   {
     variants: {
       variant: {

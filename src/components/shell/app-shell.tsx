@@ -28,7 +28,7 @@ export function AppShell({
         id="main"
         tabIndex={-1}
         className={cn(
-          "flex-1 outline-none",
+          "flex-1 focus-visible:outline-0",
           hasBottomNav && "max-md:pb-[calc(4rem+env(safe-area-inset-bottom))]",
         )}
       >

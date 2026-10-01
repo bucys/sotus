@@ -11,6 +11,10 @@ const bannedPatterns = [
       /focus-visible:(ring-|border-ring)|aria-invalid:ring-|outline-ring\//,
     why: "semi transparent focus ring, the global outline covers it",
   },
+  {
+    pattern: /(^|[\s"'`])outline-none\b/,
+    why: "removes the global focus outline, never on a control",
+  },
   { pattern: /(^|[\s"'`:])dark:/, why: "no dark theme yet" },
   {
     pattern:
