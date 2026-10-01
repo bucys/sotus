@@ -171,6 +171,9 @@
   *::after {
     animation: none !important;
     transition: none !important;
-    transform: none !important;
+  }
+
+  .skeleton-shimmer {
+    background-image: none;
   }
 }

@@ -113,7 +113,7 @@ Fonts load in `src/app/layout.tsx` with `next/font/google`: Bricolage Grotesque 
 | Spinner | `animate-spin` | loop | Still icon, `pendingLabel` carries the meaning |
 | Alert entry (optional) | `motion-safe:animate-in fade-in` | 200ms | None |
 
-A global `prefers-reduced-motion: reduce` rule removes all animations, transitions and transforms (not shortened). No JavaScript animation library.
+Under `prefers-reduced-motion: reduce` all motion is removed (not shortened). A global rule sets `animation: none !important; transition: none !important`; motion transforms such as the button press use the `motion-safe:` variant, so they never apply. The global rule never resets `transform`, `translate`, `scale` or `rotate`: positioned overlays (Radix Popper menus, popovers, selects, tooltips) place themselves with an inline transform that must keep working. No JavaScript animation library.
 
 ## Icons
 
@@ -139,7 +139,7 @@ Built by feature #4. Recipe specific parts (recipe card, provenance line, ingred
 | `Spinner` | `ui/spinner.tsx` | `aria-hidden="true"`, no role |
 | `Input` | `ui/input.tsx` | `min-h-11`, 16px text, `bg-card`, `input` border |
 | `Label` | `ui/label.tsx` | `type-label` |
-| `Field` parts | `ui/field.tsx` | `Field`, `FieldLabel`, `FieldDescription`, `FieldError`. A visible label always; a placeholder is never the label. The form wires ids with `useId()`: the input's `aria-describedby` lists the description id and, when present, the error id. An error sets `aria-invalid="true"` on the input and `data-invalid` on `Field`, and keeps the typed value. `FieldError` has no `role="alert"`. After a failed submit, focus moves to the first invalid input, or to the form's main input when the failure is not tied to a field |
+| `Field` parts | `ui/field.tsx` | `Field`, `FieldLabel`, `FieldDescription`, `FieldError`. A visible label always; a placeholder is never the label. The form wires ids with `useId()`: the input's `aria-describedby` lists the description id and, when present, the error id. An error sets `aria-invalid="true"` on the input and `data-invalid` on `Field`, and keeps the typed value. `FieldError` has no `role="alert"`. After a failed submit, focus moves to the first invalid input, or to the form's main input when the failure is not tied to a field. If the invalid input already has focus (Enter pressed while typing, or a repeat submit), focus stays and the error text goes into the form's `role="status"` region instead, visually hidden: clear the region, then set the text on the next frame, so a repeated error is read again |
 | `Alert` | `ui/alert.tsx` | `tone`: `info` (muted surface) or `problem` (card surface, paprika side bar, `highlight-ink` icon, ink text). `announce`: `off` (default, no role), `polite` (`role="status"`), `assertive` (`role="alert"`, only for a failure newly returned by an action) |
 | `Badge` | `ui/badge.tsx` | `rounded-full`, no opacity hovers |
 | `Card` | `ui/card.tsx` | Hairline border, no shadow, `rounded-lg`, `bg-card` |
@@ -151,12 +151,14 @@ Built by feature #4. Recipe specific parts (recipe card, provenance line, ingred
 | Situation | Visual | Announcement | Focus |
 |---|---|---|---|
 | Action running | Button with `Spinner` and `pendingLabel`, optional `Skeleton` preview (`aria-hidden`) | One stable `role="status"` region mounted with the form, empty when idle, text changes when work starts | Unchanged |
-| Field validation error | Red input border, `FieldError` text | None of its own, read through the input's `aria-describedby` | To the first invalid input |
+| Field validation error | Red input border, `FieldError` text | Through the input's `aria-describedby` when focus moves to it; through the form's status region (cleared, then set on the next frame) when the input already had focus. Never both | To the first invalid input (unchanged if already there) |
 | Extraction or system failure | `Alert tone="problem"` under the form | `announce="assertive"`, once, when inserted | To the form's main input |
 | Success | Owning feature redirects | Next.js route announcer | Next.js |
 | Static info on load | `Alert tone="info"` | `announce="off"` | Unchanged |
 | Route loading | `loading.tsx` with `Skeleton` blocks | Visually hidden `role="status"` text "Loading" | Unchanged |
 | Empty list | `Empty` with one action | None | Unchanged |
+
+Every announced moment speaks through exactly one channel: focus plus `aria-describedby`, the status region, or an assertive alert. Never two at once.
 
 ## Shell
 
@@ -184,11 +186,14 @@ Every new shadcn component needs these edits. `pnpm check:ui` (`scripts/check-ui
 | Banned pattern | Why | Replace with |
 |---|---|---|
 | `focus-visible:ring-`, `focus-visible:border-ring`, `aria-invalid:ring-`, `outline-ring/` | Semi transparent focus ring | Nothing, the global outline covers it |
+| `outline-none`, `outline-hidden`, `outline-0`, alone or with a `focus:` or `focus-visible:` prefix | Removes the global focus outline | Nothing, keep the global outline. One allowlisted exception, below |
 | `dark:` | No dark theme yet | Nothing |
 | `text-white`, `bg-black`, `bg-white`, palette colours (`red-`, `green-`), `bg-[#`, `text-[#` | Raw colours bypass tokens | Semantic tokens |
 | Opacity on `input`, `ring`, `destructive`, `foreground`, `muted-foreground` | Breaks the contrast table | Solid tokens, `accent` for hover |
 | `h-6` to `h-9`, `size-6` to `size-9` on interactive elements | Below 44px | `min-h-11`, `size-11` |
 | `active:translate-y-px`, unprefixed `animate-` on loops | Motion outside the rules | `motion-safe:` variants |
+
+Allowlist: the script accepts exactly one line, `"flex-1 focus-visible:outline-0",` in `src/components/shell/app-shell.tsx`, the `<main id="main" tabIndex={-1}>` that only the skip link focuses (an outline around the whole page would be noise). It matches by file and exact line text, so a reformat of that line, or the same class anywhere else, fails the guard. Add an entry only for an element that is never a control.
 
 ## Illustrative screens
 

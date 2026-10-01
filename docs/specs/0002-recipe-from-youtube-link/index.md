@@ -1,7 +1,7 @@
 # 0002. Recipe from a YouTube link: text first, grounded extraction
 
 **Date**: 2026-09-30
-**Status**: Proposed
+**Status**: In Progress
 
 Supersedes the *YouTube extraction* row, the *YouTube path* note and the *Gemini YouTube feasibility spike* section of [0001](../0001-stack-architecture/index.md). Everything else in 0001 stays in force. Duplicate handling, the save RPC and the `extraction_method` values follow [0003](../0003-data-model/index.md), which is their source.
 
@@ -29,7 +29,7 @@ Slice 1 (link and description):
 - **AC-7**: When no step found any cooking content, the outcome is `insufficient` with the message "This video doesn't include a written recipe we can read yet." When a step found partial content (for example ingredients but no steps), the message is "We found cooking content but not a full recipe." plus what was missing. Slice 1 never returns `not_a_recipe` for a YouTube link.
 - **AC-8**: A video that is not found, private, deleted, live or upcoming shows "This video isn't available. It may be private, deleted or still live." with no Gemini call.
 - **AC-9**: Every saved YouTube recipe keeps the canonical video URL, video ID, video title, channel name, thumbnail and extraction method, and the recipe page links to the video. The title is the JSON-LD name, else the extracted title, else the video title.
-- **AC-10**: While the link is processed, the submit button is disabled with a spinner and the text "Reading the video… this can take about a minute". The field cannot be submitted twice. The user ends on the recipe page or sees a clear message within 75 s.
+- **AC-10**: While the link is processed, the submit button is disabled with a spinner and the short label "Reading…", and the form's status region (a `role="status"` element mounted with the form) shows "Reading the video… this can take about a minute". The field cannot be submitted twice. The user ends on the recipe page or sees a clear message within 75 s; after a failure, focus returns to the link field. Pending, announcement and focus follow [0004](../0004-design-system-ui-foundation/index.md) *Pending, loading and feedback contract*.
 - **AC-11**: Each paste that passes AC-1 and AC-3 reserves exactly one `extract_youtube` quota attempt before the first external call, whatever steps run after. Over the limit shows "You've reached today's limit for adding recipes. Try again tomorrow." The attempt row always ends with its outcome and reason.
 - **AC-12**: A transient Gemini error (HTTP 429, 500, 503) is retried once only if its step budget still fits. If it still fails, the user sees "Our recipe reader is busy right now. Try again in a minute."
 - **AC-13**: When two people paste the same new video at the same time, only one recipe is saved and both end on it; both users get a `saved_recipes` row for it (the winner is its `added_by`), and both attempts end as `recipe`.
@@ -149,7 +149,7 @@ Worst case 60 s, under the 65 s cutoff. A Gemini retry (0001: one, on 429/500/50
 
 **Error edge**: the action's catch all that turns an unexpected throw into `ingestion_failed` must rethrow Next.js redirect errors (`unstable_rethrow` or equivalent), or the success redirect is swallowed.
 
-**Pending UI**: the shared "Add a link" form is a client component using `useActionState`. The pending text depends on the host typed, checked with a shared pure `isYouTubeHost(url)` helper that the server router uses too: YouTube hosts show "Reading the video… this can take about a minute". A failure renders its message under the field with `role="alert"`, and the field keeps the pasted link.
+**Pending UI**: the shared "Add a link" form is a client component using `useActionState`. The pending text depends on the host typed, checked with a shared pure `isYouTubeHost(url)` helper that the server router uses too: for YouTube hosts the button label is "Reading…" and the form's stable status region shows "Reading the video… this can take about a minute" (0004: the long text never goes in the button). The field keeps the pasted link after any failure, and focus returns to it. The invalid link message ("That YouTube link doesn't point to a video.") is a field validation error: `aria-invalid` on the input, the message in `FieldError`, read through `aria-describedby`. Every other failure message renders under the field as `Alert tone="problem" announce="assertive"` (no red), not linked to the input, so it is announced once.
 
 ### Data model sketch
 

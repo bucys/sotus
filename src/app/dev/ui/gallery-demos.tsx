@@ -2,6 +2,7 @@
 
 import { InboxIcon } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
+import { flushSync } from "react-dom";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export function GalleryDemos() {
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState("");
+  const [errorAnnouncement, setErrorAnnouncement] = useState("");
   const [fieldError, setFieldError] = useState<string | undefined>();
   const [failed, setFailed] = useState(false);
   const [assertiveMounted, setAssertiveMounted] = useState(false);
@@ -36,10 +38,19 @@ export function GalleryDemos() {
 
     setFailed(false);
     setFieldError(undefined);
+    setErrorAnnouncement("");
 
     if (!value.startsWith("http")) {
-      setFieldError("Enter a link that starts with http or https.");
-      inputRef.current?.focus();
+      const message = "Enter a link that starts with http or https.";
+      // Commit aria-invalid and the error id before focus, or the field is read without the error.
+      flushSync(() => setFieldError(message));
+      // Focusing an already focused input fires no event, so aria-describedby is not read.
+      // The status region speaks instead, set a frame after the clear so a repeat is read again.
+      if (document.activeElement === inputRef.current) {
+        requestAnimationFrame(() => setErrorAnnouncement(message));
+      } else {
+        inputRef.current?.focus();
+      }
       return;
     }
 
@@ -88,6 +99,7 @@ export function GalleryDemos() {
         </Button>
         <div role="status" className="type-caption text-muted-foreground">
           {status}
+          <span className="sr-only">{errorAnnouncement}</span>
         </div>
         {failed ? (
           <Alert tone="problem" announce="assertive">

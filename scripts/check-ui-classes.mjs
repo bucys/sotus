@@ -12,7 +12,7 @@ const bannedPatterns = [
     why: "semi transparent focus ring, the global outline covers it",
   },
   {
-    pattern: /(^|[\s"'`])outline-none\b/,
+    pattern: /(^|[\s"'`:])outline-(none|hidden|0)(?![\w-])/,
     why: "removes the global focus outline, never on a control",
   },
   { pattern: /(^|[\s"'`:])dark:/, why: "no dark theme yet" },
@@ -40,6 +40,20 @@ const bannedPatterns = [
   },
 ];
 
+// <main tabIndex={-1}> is focused only by the skip link, so a ring around the whole page
+// would be noise. Matched on file and exact line so nothing else slips through.
+const allowedLines = [
+  {
+    file: "src/components/shell/app-shell.tsx",
+    line: '"flex-1 focus-visible:outline-0",',
+  },
+];
+
+const isAllowed = (file, line) =>
+  allowedLines.some(
+    (allowed) => file.endsWith(allowed.file) && line.trim() === allowed.line,
+  );
+
 const listFiles = (dir) =>
   readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -58,7 +72,7 @@ const problems = files.flatMap((file) =>
     .split("\n")
     .flatMap((line, index) =>
       bannedPatterns
-        .filter(({ pattern }) => pattern.test(line))
+        .filter(({ pattern }) => pattern.test(line) && !isAllowed(file, line))
         .map(({ why }) => `${file}:${index + 1}  ${why}\n    ${line.trim()}`),
     ),
 );

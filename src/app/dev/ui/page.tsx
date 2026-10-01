@@ -1,5 +1,6 @@
 import { InboxIcon } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { GalleryDemos } from "@/app/dev/ui/gallery-demos";
@@ -97,6 +98,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export default async function GalleryPage({
   searchParams,
 }: PageProps<"/dev/ui">) {
+  if (process.env.NODE_ENV !== "development") {
+    notFound();
+  }
+
   // ?nav=one shows the shell with a single destination, where both navigations must render nothing.
   const { nav } = await searchParams;
   const items = nav === "one" ? [galleryItem] : [galleryItem, homeItem];
