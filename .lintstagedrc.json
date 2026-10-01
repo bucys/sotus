@@ -1,4 +1,5 @@
 {
   "*.{ts,tsx,mjs}": ["eslint --fix", "prettier --write"],
-  "*.{json,css,md}": "prettier --write"
+  "*.{json,css,md}": "prettier --write",
+  "*.tsx": "node scripts/check-ui-classes.mjs"
 }

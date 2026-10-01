@@ -11,7 +11,8 @@
     "spike:gemini-youtube": "node --experimental-strip-types --env-file=.env.local scripts/spike-gemini-youtube.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "check:ui": "node scripts/check-ui-classes.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
