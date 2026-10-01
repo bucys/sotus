@@ -47,6 +47,9 @@ pnpm typecheck
 # Lint
 pnpm lint
 
+# UI class guard (banned shadcn patterns, see docs/design.md "After shadcn add")
+pnpm check:ui
+
 # Format (Prettier; `format:check` only reports)
 pnpm format
 pnpm format:check
@@ -83,6 +86,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`, with `rationa
 - **Reserve before cost, save only what passed.** No fetch or Gemini call starts without a successful quota reservation, and only an accepted recipe is written, atomically. One `AbortSignal` carries the 75 s deadline to every step.
 - **Named exports only.** Next.js route files are the exception: `page.tsx`, `layout.tsx`, `route.ts` and friends must default export.
 - **Mobile first, WCAG AA.** Phone width is the design target. Sufficient contrast, visible focus, keyboard reachable, real labels, one `<h1>` per page, alt text on every image.
+- Design system: build all UI to [docs/design.md](docs/design.md) (art direction and the product bar); token values live in `src/app/globals.css`.
 - **`cn` comes from the `cn` package** (`shadcn-ui/cn`), re-exported by [src/lib/utils.ts](src/lib/utils.ts). It is the official drop in for `clsx` + `tailwind-merge`; do not swap it back.
 - **Comments explain why, not what.** [src/lib/supabase/server.ts](src/lib/supabase/server.ts) sets the bar: a comment earns its place when the reason is not obvious from the code.
 - **Conventional commits**: `feat:`, `fix:`, `chore:`, `docs:`.
@@ -94,7 +98,7 @@ Vitest, which stays deferred.
 
 - **TypeScript**: keep `strict`, and add `noUncheckedIndexedAccess`, `noImplicitOverride` and `noFallthroughCasesInSwitch`. Model output and record lookups are full of optional fields, so the index check pays for itself.
 - **Lint and format**: ESLint with `eslint-config-next` (installed) plus Prettier with `prettier-plugin-tailwindcss` so class lists stay sorted.
-- **Before a commit**: husky and lint-staged run ESLint and Prettier on staged files, then `tsc --noEmit`.
+- **Before a commit**: husky and lint-staged run ESLint and Prettier on staged files, `check:ui` on staged `.tsx` files, then `tsc --noEmit`.
 - **Continuous integration**: none. Every push already gets a Vercel build and a preview URL, and that is the gate. Lint and format stay local, caught by the commit hook.
 - **Tests**: none required at the Alpha tier; each feature is proved with `/check verify`. Vitest arrives only if a feature moves to Beta. The Gemini spike is a script, not a test.
 
@@ -128,5 +132,7 @@ Declined: Tailwind v4 docs skills, zod community skills, shadcn community MCP, `
 ## Context files
 
 <!-- Nested AGENTS.md files are listed here as they are created -->
+
+- [src/components/AGENTS.md](src/components/AGENTS.md): the edited shadcn primitives in `ui/`, the app shell in `shell/`, and the rules for adding a component
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
