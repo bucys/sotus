@@ -16,7 +16,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 1 | Stack & architecture | Foundation | in-progress |
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
-| 4 | Design system & UI foundation | Foundation | planned |
+| 4 | Design system & UI foundation | Foundation | done |
 | 5 | Sign in | Release 1 | planned |
 | 6 | Recipe from a web page link | Release 1 | planned |
 | 7 | Recipe from a YouTube link | Release 1 | in-progress |
@@ -56,10 +56,18 @@ spec [0003](../specs/0003-data-model/index.md) · code in `supabase/migrations/`
 - [x] Verify it: `/check verify data model`
   - Deferred, non blocking for Alpha: real Google profile trigger and real account deletion (feature #5), UTC day boundary rollover, Vault secret mismatch, live tracking parameter saves. Listed in `docs/specs/0003-data-model/verify.md`.
 
-### 4. Design system & UI foundation · needs a decision
+### 4. Design system & UI foundation · done
 Colors, type, spacing, and base components for a warm, mobile first kitchen feel (the earlier "Sodrus" direction in the Vault is a starting input, not a lock).
 **Done when:** `design.md` covers tokens and core components, and base components meet contrast, focus, and keyboard basics at phone width.
-- [ ] Design it (spec): `/architect design system & UI foundation`
+spec [0004](../specs/0004-design-system-ui-foundation/index.md)
+- [x] Design it (spec): `/architect design system & UI foundation`
+- [x] Build it: `/develop design system & UI foundation`
+  - [x] `docs/design.md` written (AC-1)
+  - [x] Tokens, focus outline, type utilities, motion rules and fonts in `globals.css` and `layout.tsx` (AC-2 to AC-7, AC-14)
+  - [x] `check:ui` guard, then the edited shadcn primitives and feedback components (AC-3, AC-4, AC-9 to AC-12, AC-15)
+  - [x] App shell and the `/dev/ui` gallery (AC-8, AC-9, AC-13, AC-16)
+- [x] Verify it: `/check verify design system & UI foundation`
+  - Deferred, non blocking for Alpha: a real phone with the software keyboard and a real screen reader pass. The commit hook was exercised for real: a staged `.tsx` file with a banned class made `lint-staged` fail on `check:ui`. First verified on commit 306d091, verified again on 2026-10-01 after the review fixes; evidence in `docs/specs/0004-design-system-ui-foundation/verify.md`.
 
 ## Release 1: Link in, recipe out
 
@@ -140,6 +148,8 @@ Out of scope for the demo, kept so the plan stays honest.
 - **Shopping list and pantry**: merged, pantry aware list from the plan · needs a decision
 - **Nutrition goals and tracking** · needs a decision
 - **Chat with your collection**: free form cooking questions · needs a decision
+- **Dark theme**: Sodrus dark values as the starting point, contrast checked again · from spec 0004
+- **Tap to check off ingredients and steps** while cooking · from spec 0004
 - **Lithuanian language** · needs a decision
 - **Native mobile app with share sheet capture** · needs a decision
 - **Public landing page with SEO**
