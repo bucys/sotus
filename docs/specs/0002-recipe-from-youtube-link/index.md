@@ -63,9 +63,11 @@ parse id ─ invalid → ingestion_failed / blocked_url          (no quota)
    │
 open_existing_recipe('youtube', canonical_url) ─ found → saved to collection, redirect (no quota)
    │
+YOUTUBE_API_KEY set? ─ no → metadata_unavailable, no attempt row          (no quota)
+   │
 reserve_ai_attempt('extract_youtube', canonical_url) ─ over → quota_exceeded
    │
-Data API videos.list ─ error/timeout → ingestion_failed / metadata_unavailable
+Data API videos.list ─ error/timeout/unreadable duration → ingestion_failed / metadata_unavailable
    │                  ─ empty, live, upcoming → ingestion_failed / video_unavailable
    │
 1. creator page: up to 2 description links → safeFetch → JSON-LD only → contract + title overlap
@@ -116,7 +118,8 @@ Worst case 60 s, under the 65 s cutoff. A Gemini retry (0001: one, on 429/500/50
 | `liveBroadcastContent` is `live` or `upcoming` | `ingestion_failed` / `video_unavailable` |
 | `privacyStatus` not `public` | transcript skipped (`video_not_watchable`) |
 | `ytRating = ytAgeRestricted` or any `regionRestriction` | transcript skipped (`video_not_watchable`) |
-| duration over 1200 s | transcript skipped (`video_too_long`) |
+| duration missing or unreadable | `ingestion_failed` / `metadata_unavailable` |
+| duration read and over 1200 s | transcript skipped (`video_too_long`) |
 
 **Step 1, creator page** (`creator-page.ts`): take `http(s)` URLs from the description in order of appearance. Drop hosts on a fixed deny list (`youtube.com`, `youtu.be`, `instagram.com`, `tiktok.com`, `facebook.com`, `fb.com`, `x.com`, `twitter.com`, `threads.net`, `pinterest.*`, `amazon.*`, `amzn.to`, `patreon.com`, `linktr.ee`, `bit.ly`, `geni.us`, `spotify.com`, `discord.gg`), and drop duplicates. Rank the rest: links whose path has at least one segment beyond `/` come first (a recipe page, not a home page), otherwise keep description order. Fetch the top 2 **in parallel** through `safeFetch` and #6's JSON-LD reader only (no Gemini on page text here). Of those that pass the acceptance contract, accept the higher ranked one whose JSON-LD `name` shares at least one token with the video title (tokens as in *Grounding*, minus the checked in `STOP_WORDS` constant, English). A fetch or JSON-LD failure is not an outcome; the attempt's JSON log line records how many links were tried and failed, and the ladder moves on.
 
@@ -185,7 +188,7 @@ Attempt row (0001): `started` → `recipe` | `not_a_recipe` | `insufficient` | `
 | Action | Kind | Key inputs | Key outputs | Auth | Key errors |
 |---|---|---|---|---|---|
 | `addRecipeFromLink` | Server Action (shared with #6) | `url: string` (req, trimmed, ≤ 2048, http/https) | redirect to `/recipes/<id>` (new or existing), or `{ outcome, reason, message }` | signed in (`getUser()`); none → redirect to sign in | `blocked_url`, `video_unavailable`, `metadata_unavailable`, `quota_exceeded`, `provider_error`, `timeout`, `invalid_model_output`, `insufficient`, `not_a_recipe` |
-| `videos.list` (outbound) | GET, fixed host | `id`, `part`, `fields`, `key` | snippet, contentDetails, status | `YOUTUBE_API_KEY` | non 2xx or timeout → `metadata_unavailable` |
+| `videos.list` (outbound) | GET, fixed host | `id`, `part`, `fields`, `key` | snippet, contentDetails, status | `YOUTUBE_API_KEY` | non 2xx, timeout or unreadable duration → `metadata_unavailable` |
 | Gemini `generateContent` (outbound) | SDK | text, or canonical URL as file input | provider response / pass 1 schema | `GEMINI_API_KEY` | 429/500/503 → one retry → `provider_error` |
 
 ### Outcome reasons and messages
@@ -236,7 +239,7 @@ When slice 2 is live, `no_written_recipe` is only reached for a video the transc
 ### Key invariants
 
 - The pasted URL never leaves the parser. Only the video ID and canonical URL are used after it.
-- No external call before a successful quota reservation. Parse failures and duplicates reserve nothing.
+- No external call before a successful quota reservation. Parse failures, duplicates and a missing `YOUTUBE_API_KEY` reserve nothing.
 - Exactly one attempt row per reserved paste. It is finished by the save RPC or `finish_ai_attempt`, unless the function is killed first, in which case it reads as `interrupted` (0001).
 - One recipe per `youtube_video_id`, enforced by `recipes_youtube_video_id_key`.
 - A saved description or transcript recipe contains no ingredient name token, and no quantity or unit, absent from its cleaned grounding source (quantity and unit in the same segment as the ingredient), and no step number absent from it.
@@ -248,7 +251,7 @@ When slice 2 is live, `no_written_recipe` is only reached for a video the transc
 
 - Signed in users only; the action identifies the user with `supabase.auth.getUser()`.
 - RLS from #3: every signed in user reads every recipe; inserts only through the signed save RPC, with `added_by = auth.uid()` as attribution only; recipes are read only for users (0003). The attempt table follows 0001 (own rows readable, writes only through the `SECURITY DEFINER` functions).
-- `YOUTUBE_API_KEY` and `GEMINI_API_KEY` are read only in `server-only` modules, and are validated where read, throwing when absent (like `src/lib/supabase/env.ts`). `YOUTUBE_API_KEY` is restricted in Google Cloud to the YouTube Data API v3, and never logged (it sits in the request URL).
+- `YOUTUBE_API_KEY` and `GEMINI_API_KEY` are read only in `server-only` modules. `GEMINI_API_KEY` is validated where read and throws when absent (like `src/lib/supabase/env.ts`). `YOUTUBE_API_KEY` is read lazily, so web links keep working without it: a YouTube paste checks it after the duplicate lookup and before `reserve_ai_attempt`, and when it is missing returns `metadata_unavailable` with no attempt row and no quota spent. `YOUTUBE_API_KEY` is restricted in Google Cloud to the YouTube Data API v3, and never logged (it sits in the request URL).
 - Description text and transcripts are untrusted third party input (prompt injection is possible). Gemini has no tools, answers only through the response schema, and every value passes grounding and the contract. The worst case is a wrong canonical recipe in the shared library, correctable only by a future admin path (0003 launch gate); #13 lets each user adjust their own version.
 - Description links take the full `safeFetch` guard (SSRF, redirects, size, time). At most 2 per paste.
 - No personal data beyond what 0001 already stores. No compliance scope. The YouTube API Services policies limit how long API data (video title, channel name) may be kept; accepted for a non commercial demo, to be checked before any public launch (Follow-up).

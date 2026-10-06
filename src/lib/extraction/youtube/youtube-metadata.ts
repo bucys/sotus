@@ -9,9 +9,15 @@ import {
 const FIELDS =
   "items(snippet(title,description,channelTitle,thumbnails,liveBroadcastContent),contentDetails(duration,regionRestriction,contentRating/ytRating),status/privacyStatus)";
 
-export type MetadataResult =
-  | VideoDetailsResult
-  | { readonly available: "error"; readonly status?: number };
+export type MetadataResult = VideoDetailsResult;
+
+/**
+ * Read per call, not at import: the shared add link action loads this module for web
+ * links too, and a missing YouTube key must not take the web path down with it.
+ */
+export function isYouTubeConfigured(): boolean {
+  return Boolean(process.env.YOUTUBE_API_KEY);
+}
 
 /**
  * One `videos.list` call to a fixed host, so it does not go through `safeFetch`. The
@@ -21,8 +27,8 @@ export async function fetchVideoMetadata(
   videoId: string,
   signal: AbortSignal,
 ): Promise<MetadataResult> {
-  // Read per call, not at import: the shared add link action loads this module for web
-  // links too, and a missing YouTube key must not take the web path down with it.
+  // The add link action checks `isYouTubeConfigured()` before reserving; this guard
+  // only narrows the type.
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     console.error(
@@ -76,5 +82,15 @@ export async function fetchVideoMetadata(
     );
     return { available: "error", status: response.status };
   }
-  return toVideoDetails(parsed.data);
+  const details = toVideoDetails(parsed.data);
+  if (details.available === "error") {
+    console.error(
+      JSON.stringify({
+        event: "youtube_metadata_failed",
+        video_id: videoId,
+        error: "duration",
+      }),
+    );
+  }
+  return details;
 }

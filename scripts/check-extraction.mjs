@@ -687,6 +687,13 @@ expect(
   false,
 );
 expect("video title trimmed", details([item()]).video?.title, "Miso Soup");
+for (const duration of [undefined, "", "1:20"]) {
+  expect(
+    `video duration unreadable ${duration}`,
+    details([item({ contentDetails: { duration } })]).available,
+    "error",
+  );
+}
 for (const [label, overrides, want] of [
   ["public short", {}, "watchable"],
   [

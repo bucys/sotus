@@ -35,14 +35,15 @@ export type VideoDetails = {
   readonly title: string;
   readonly description: string;
   readonly channelTitle: string;
-  readonly durationSeconds?: number;
+  readonly durationSeconds: number;
   /** Decided from metadata alone; the transcript step (slice 2) reads it. */
   readonly watchability: Watchability;
 };
 
 export type VideoDetailsResult =
   | { readonly available: true; readonly video: VideoDetails }
-  | { readonly available: false };
+  | { readonly available: false }
+  | { readonly available: "error"; readonly status?: number };
 
 export const MAX_WATCH_SECONDS = 1200;
 
@@ -64,7 +65,7 @@ export function durationSeconds(text: string | undefined): number | undefined {
 
 function watchabilityOf(
   item: VideosList["items"][number],
-  seconds: number | undefined,
+  seconds: number,
 ): Watchability {
   const { contentDetails, status } = item;
   if (status.privacyStatus !== "public") return "video_not_watchable";
@@ -74,12 +75,13 @@ function watchabilityOf(
   ) {
     return "video_not_watchable";
   }
-  if (seconds === undefined || seconds > MAX_WATCH_SECONDS)
-    return "video_too_long";
-  return "watchable";
+  return seconds > MAX_WATCH_SECONDS ? "video_too_long" : "watchable";
 }
 
-/** The watchability table of 0002: empty, live or upcoming means unavailable. */
+/**
+ * The watchability table of 0002: empty, live or upcoming means unavailable. A duration
+ * we cannot read is a metadata failure, not a long video: `video_too_long` needs a real length.
+ */
 export function toVideoDetails(list: VideosList): VideoDetailsResult {
   const item = list.items[0];
   if (!item) return { available: false };
@@ -87,6 +89,7 @@ export function toVideoDetails(list: VideosList): VideoDetailsResult {
   if (live === "live" || live === "upcoming") return { available: false };
 
   const seconds = durationSeconds(item.contentDetails.duration);
+  if (seconds === undefined) return { available: "error" };
   return {
     available: true,
     video: {

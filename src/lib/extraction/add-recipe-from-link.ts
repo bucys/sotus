@@ -31,6 +31,7 @@ import { messageFor, type MessageSource } from "./messages";
 import { linkInputSchema } from "./schemas";
 import { extractFromYouTube } from "./youtube/extract-from-youtube";
 import { parseYouTubeUrl } from "./youtube/parse-youtube-url";
+import { isYouTubeConfigured } from "./youtube/youtube-metadata";
 
 const NO_TOKENS: Tokens = { input: 0, output: 0 };
 
@@ -85,6 +86,8 @@ type Route = {
   readonly attemptKind: "extract_web" | "extract_youtube";
   /** The URL dedup, the attempt and the recipe use: the link itself, or the canonical video URL. */
   readonly sourceUrl: string;
+  /** False when the route's own keys are missing; checked before any quota is reserved. */
+  readonly configured: boolean;
   readonly extract: (deadline: Deadline) => Promise<Extraction>;
 };
 
@@ -93,6 +96,7 @@ function webRoute(url: string): Route {
     source: "web",
     attemptKind: "extract_web",
     sourceUrl: url,
+    configured: true,
     extract: async (deadline) => {
       const { sourceTitle, ...rest } = await extractFromWeb(url, deadline);
       return { ...rest, fields: { source_title: sourceTitle } };
@@ -126,6 +130,7 @@ export async function addRecipeFromLink(
       source: "youtube",
       attemptKind: "extract_youtube",
       sourceUrl: video.canonicalUrl,
+      configured: isYouTubeConfigured(),
       extract: (routeDeadline) => extractFromYouTube(video, routeDeadline),
     };
   } else {
@@ -154,6 +159,12 @@ export async function addRecipeFromLink(
       return fail(existing.reason);
     }
     if (existing.recipeId) redirect(recipePath(existing.recipeId, true));
+
+    // A missing YouTube key is our setup, not the user's spend: no attempt row, no quota.
+    if (!route.configured) {
+      console.error(JSON.stringify({ event: "youtube_not_configured", host }));
+      return fail("metadata_unavailable");
+    }
 
     stage = "reserve";
     const reserved = await reserveAttempt(
