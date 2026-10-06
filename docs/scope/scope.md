@@ -106,8 +106,8 @@ spec [0002](../specs/0002-recipe-from-youtube-link/index.md) · builds after #3 
   - [x] Slice 1 foundations: YouTube key, link parsing and routing, duplicate check, Data API metadata (AC-1, AC-2, AC-3, AC-8, AC-13)
   - [x] Slice 1 extraction: grounding, creator page, description step, orchestration and save (AC-4 to AC-7, AC-9, AC-11, AC-12)
   - [x] Slice 1 UI: pending state, messages, provenance line and notice (AC-10)
-  - [ ] Spike 2: grounded transcript on the five videos, evidence in spec 0002 (gates slice 2)
-  - [ ] Slice 2: grounded transcript step, only if spike 2 passes (AC-14 to AC-16)
+  - [ ] Spike 2: grounded transcript on seven videos at two media resolutions, evidence in spec 0002 (gates slice 2)
+  - [ ] Slice 2: grounded transcript step behind `YOUTUBE_TRANSCRIPT`, only if spike 2 passes, with its own `/check verify` (AC-14 to AC-18)
 - [x] Verify it: `/check verify recipe from a youtube link`
 
 ### 8. Recipe page
