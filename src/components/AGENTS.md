@@ -6,8 +6,9 @@ component and state is `/dev/ui` (development only, `src/app/dev/ui/`).
 
 ## Layout
 
-- `ui/`: shadcn (`radix-nova`) primitives, **edited** after `shadcn add`: Button, Input, Label, Field, Alert, Badge, Card, Empty, Skeleton, Spinner, Separator.
+- `ui/`: shadcn (`radix-nova`) primitives, **edited** after `shadcn add`: Button, Input, Label, Field, Alert, Badge, Card, Empty, Skeleton, Spinner, Separator, Avatar, DropdownMenu.
 - `shell/`: `AppShell` (skip link, header, `<main id="main" tabIndex={-1}>`, bottom nav), `PageContainer`, and `NavLinks`, the only client component in the shell.
+- `auth/`: `SignInButton`, `AccountMenu` (avatar plus Sign out) and `AuthUnavailable`. Auth logic stays in `src/lib/auth/` (see its AGENTS.md).
 - `shell/nav-items.ts`: the navigation list. Add an entry only when its route exists; navigation renders nothing with fewer than two.
 
 ## Rules

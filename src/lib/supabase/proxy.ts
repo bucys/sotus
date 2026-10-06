@@ -26,9 +26,11 @@ function nextFor(request: NextRequest) {
 
 /**
  * Refreshes the session cookie, then does the navigation help: a verified signed
- * out GET goes to /sign-in, a signed in GET to /sign-in goes on to where it was
- * headed. This is not the security guarantee (requireUser() is), so it never
- * redirects a mutation and never acts on an answer it could not get.
+ * out GET goes to /sign-in. This is not the security guarantee (requireUser()
+ * is), so it never redirects a mutation and never acts on an answer it could
+ * not get. It never sends a signed in visit away from /sign-in: getClaims() can
+ * pass for a revoked session that getUser() rejects, and the layout would send
+ * it straight back. The page does that redirect after getUser().
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -80,9 +82,6 @@ function redirectTarget(request: NextRequest, status: AuthStatus) {
   const { pathname } = request.nextUrl;
   if (status === "signed_out" && !PUBLIC_PATHS.has(pathname)) {
     return signInPath(undefined, nextFor(request));
-  }
-  if (status === "signed_in" && pathname === "/sign-in") {
-    return safeNextPath(request.nextUrl.searchParams.get("next"));
   }
   return undefined;
 }
