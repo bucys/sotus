@@ -138,5 +138,6 @@ Declined: Tailwind v4 docs skills, zod community skills, shadcn community MCP, `
 
 - [src/components/AGENTS.md](src/components/AGENTS.md): the edited shadcn primitives in `ui/`, the app shell in `shell/`, and the rules for adding a component
 - [src/lib/extraction/AGENTS.md](src/lib/extraction/AGENTS.md): the shared add link pipeline for web pages and YouTube, its deadline, typed failures and the pure modules `check:extraction` covers
+- [src/lib/ai/AGENTS.md](src/lib/ai/AGENTS.md): the Gemini client with its single retry, the attempt (quota) RPC wrappers, and the stored reason list
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
