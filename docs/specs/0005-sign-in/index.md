@@ -1,7 +1,7 @@
 # 0005. Sign in: Google only, with a private app behind it
 
 **Date**: 2026-10-05
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

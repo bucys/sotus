@@ -50,6 +50,9 @@ pnpm lint
 # UI class guard (banned shadcn patterns, see docs/design.md "After shadcn add")
 pnpm check:ui
 
+# Auth helper checks (safeNextPath, auth classification, origin rules)
+pnpm check:auth
+
 # Format (Prettier; `format:check` only reports)
 pnpm format
 pnpm format:check
@@ -134,5 +137,6 @@ Declined: Tailwind v4 docs skills, zod community skills, shadcn community MCP, `
 <!-- Nested AGENTS.md files are listed here as they are created -->
 
 - [src/components/AGENTS.md](src/components/AGENTS.md): the edited shadcn primitives in `ui/`, the app shell in `shell/`, and the rules for adding a component
+- [src/lib/auth/AGENTS.md](src/lib/auth/AGENTS.md): Google sign in, the `requireUser()` guard every protected entry point calls, and the `next` and origin rules
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

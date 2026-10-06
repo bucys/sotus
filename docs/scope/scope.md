@@ -17,7 +17,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
-| 5 | Sign in | Release 1 | in-progress |
+| 5 | Sign in | Release 1 | done |
 | 6 | Recipe from a web page link | Release 1 | planned |
 | 7 | Recipe from a YouTube link | Release 1 | in-progress |
 | 8 | Recipe page | Release 1 | planned |
@@ -73,17 +73,17 @@ spec [0004](../specs/0004-design-system-ui-foundation/index.md)
 
 The smallest usable Sotus: sign in, paste a link, get a clean recipe everyone can see.
 
-### 5. Sign in · in-progress
+### 5. Sign in · done
 Simple sign in so recipes have an owner and the app knows whose collection is whose.
 **Done when:** a person can sign up, sign in, and sign out on a phone; signed out visitors are sent to sign in.
 spec [0005](../specs/0005-sign-in/index.md) · code in `src/lib/auth/`, `src/app/(auth)/`, `src/app/(app)/`, `src/app/auth/`, `src/components/auth/`
 - [x] Design it (spec): `/architect sign in`
-- [ ] Build it: `/develop sign in`
-  - [ ] Setup, helpers and `requireUser()` (code done; the Google and Supabase dashboard setup is still yours to do): Google and Supabase settings, `safeNextPath`, auth classification, one guard for every protected entry point (AC-3, AC-7 to AC-10, AC-12)
+- [x] Build it: `/develop sign in`
+  - [x] Setup, helpers and `requireUser()` (code done; Google and Supabase dashboard setup completed and verified in production): Google and Supabase settings, `safeNextPath`, auth classification, one guard for every protected entry point (AC-3, AC-7 to AC-10, AC-12)
   - [x] Sign in thread: private `(app)` layout, `/sign-in`, Server Action, `/auth/callback` (AC-1, AC-3, AC-4, AC-7, AC-8, AC-9, AC-11, AC-12)
   - [x] Proxy gate: GET and HEAD redirects, outage pass through, cookie preserving redirects (AC-2, AC-4, AC-8, AC-12)
   - [x] Account menu, Sign out and states (AC-5, AC-6, AC-7, AC-11)
-- [ ] Verify it: `/check verify sign in`
+- [x] Verify it: `/check verify sign in`
 
 ### 6. Recipe from a web page link · needs a decision
 Paste a recipe page link and get a structured recipe (title, ingredients with amounts, steps, source). Simplest source, so it proves the extraction contract first.
