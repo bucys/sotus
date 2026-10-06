@@ -39,24 +39,23 @@ export const requireUser = cache(async (): Promise<RequireUserResult> => {
   }
 });
 
-export class AuthUnavailableError extends Error {
-  constructor() {
-    super("Could not check who is signed in");
-    this.name = "AuthUnavailableError";
-  }
-}
+export type PageUserResult =
+  { status: "signed_in"; userId: string } | { status: "unavailable" };
 
 /**
- * For pages, layouts and data reads: signed out redirects, unavailable throws
- * to the nearest error.tsx. Pass the page's own path so the person returns to it.
+ * For layouts, pages and data reads: signed out redirects, unavailable comes
+ * back as a result for the caller to render with AuthUnavailable. It is not
+ * thrown, because in production error.tsx cannot tell it from any other error.
+ * Pass the page's own path so the person returns to it.
  */
-export async function requirePageUser(nextPath?: string) {
+export async function requirePageUser(
+  nextPath?: string,
+): Promise<PageUserResult> {
   const result = await requireUser();
-  if (result.status === "unavailable") throw new AuthUnavailableError();
   if (result.status === "signed_out") {
     redirect(signInPath(undefined, safeNextPath(nextPath)));
   }
-  return result.userId;
+  return result;
 }
 
 export type ActionFailure = {

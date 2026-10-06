@@ -18,6 +18,8 @@ _Steps derived from spec 0005 acceptance criteria. `/check verify` runs these; `
 - [ ] Outage drill (pause `sotus-dev` or block its host): signed in cookies stay, a guarded page shows "Sotus cannot check your sign in" with Try again, the callback shows the unavailable message with `next` kept → AC-12
 - [ ] A signed out client with the proxy skipped (render a protected page directly) is still redirected by `requirePageUser()` → AC-8
 
+- [ ] Throw a temporary error from an `(app)` page in a production build → "Something went wrong" screen, never "Sotus cannot check your sign in" → AC-12
+
 ## Commands
 - [ ] `pnpm check:auth` → prints "auth helper checks passed" (safeNextPath table, classifyAuthResult, origin rules) → AC-3, AC-12
 - [ ] `pnpm typecheck && pnpm lint && pnpm check:ui && pnpm build` → all green → AC-11

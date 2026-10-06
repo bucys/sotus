@@ -16,6 +16,8 @@ export const authMessages = {
   signOutFailed: "We could not sign you out. Please try again.",
   unavailableTitle: "Sotus cannot check your sign in",
   unavailableBody: "Please try again in a moment.",
+  appErrorTitle: "Something went wrong",
+  appErrorBody: "Please try again.",
 } as const;
 
 export const errorMessages: Record<AuthErrorCode, string> = {

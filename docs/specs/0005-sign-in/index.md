@@ -27,7 +27,7 @@ People sign in to Sotus with one tap on "Continue with Google". Everything else 
 - **AC-9**: Sign in works from `http://localhost:3000`, a Vercel preview URL and the production URL against the one Supabase project, because the return address comes from a validated request origin (rules in Feature design).
 - **AC-10**: Email and password sign up is closed. `supabase.auth.signUp`, `signInWithPassword`, `signInWithOtp` and phone sign in with the public key all fail, and anonymous sign ins are off.
 - **AC-11**: The sign in page works at 320px wide, has one `<h1>`, a visible focus outline, a real button label, and passes WCAG AA contrast. `/sign-in` is marked `noindex`. The Google code never stays in the address bar after the callback.
-- **AC-12**: An unreachable or erroring Supabase is never treated as signed out. Existing auth cookies are kept; the proxy passes the request through unchanged; a guarded page shows an unavailable error screen; a mutating action returns `{ ok: false, reason: "unavailable" }`; a callback exchange that fails for that reason shows the unavailable message with `next` kept.
+- **AC-12**: An unreachable or erroring Supabase is never treated as signed out. Existing auth cookies are kept; the proxy passes the request through unchanged; a guarded layout or page renders the auth unavailable screen itself (an explicit typed state, never a thrown error), and an unrelated render error shows the normal app error screen, never the auth message; a mutating action returns `{ ok: false, reason: "unavailable" }`; a callback exchange that fails for that reason shows the unavailable message with `next` kept.
 
 ## Decision
 
@@ -49,12 +49,12 @@ Next.js 16 differs from older versions, so read the matching guides in `node_mod
 | Layer | Role | Signed out | Indeterminate (Supabase unreachable) |
 |---|---|---|---|
 | `src/proxy.ts` | Session refresh and navigation help; not a guarantee | GET/HEAD: redirect to `/sign-in?next=...`. Other methods: pass through | Pass the request through unchanged; write no cookies |
-| `(app)` layout | Loads the profile for the header; checks `requireUser()` | Redirect to `/sign-in` without `next` (a layout cannot know the path) | Throw `AuthUnavailableError` to `error.tsx` |
-| Page or data read | Calls `requireUser()` when it renders private data; may pass its own path as `next` | Redirect to `/sign-in?next=<own path>` | Throw `AuthUnavailableError` to `error.tsx` |
+| `(app)` layout | Loads the profile for the header; checks `requireUser()` | Redirect to `/sign-in` without `next` (a layout cannot know the path) | Render `AuthUnavailable` in place of its children (inside `AppShell`, no account menu); children never render |
+| Page or data read | Calls `requireUser()` when it renders private data; may pass its own path as `next` | Redirect to `/sign-in?next=<own path>` | Return the `unavailable` result; the page renders `AuthUnavailable` itself |
 | Mutating Server Action | Calls `requireUser()` first | Return `{ ok: false, reason: "signed_out" }`, no redirect | Return `{ ok: false, reason: "unavailable" }` |
 | Row level security | Final data authorization | Denies | Denies |
 
-`requireUser()` lives in `src/lib/auth/require-user.ts` (`server-only`, wrapped in React `cache`). It calls `supabase.auth.getUser()` and returns `{ status: "signed_in", userId } | { status: "signed_out" } | { status: "unavailable" }`. Page and layout helpers wrap it (redirect or throw); actions use it directly. The throw in render code is deliberate: a thrown error is how Next renders `error.tsx`, and it is an unexpected state for a page. Actions never throw for it.
+`requireUser()` lives in `src/lib/auth/require-user.ts` (`server-only`, wrapped in React `cache`). It calls `supabase.auth.getUser()` and returns `{ status: "signed_in", userId } | { status: "signed_out" } | { status: "unavailable" }`. `requirePageUser(nextPath?)` wraps it for layouts and pages: signed out redirects, signed in returns `{ status: "signed_in", userId }`, unavailable returns `{ status: "unavailable" }` for the caller to render `AuthUnavailable`. Actions use `requireActionUser()`. Nothing throws for the unavailable state: an expected failure is a typed result (AGENTS.md), and a thrown error cannot be told apart in `error.tsx` in production, because Next replaces the message and keeps no custom error name. `AuthUnavailableError` is removed. `(app)/error.tsx` is a normal app error screen (generic copy below) and never mentions sign in. A page that skips the layout check (soft navigation does not re-run a layout) must do its own `requirePageUser()` and render `AuthUnavailable` the same way.
 
 Classification is one pure function, `classifyAuthResult({ user, error })`, used by the proxy, `requireUser()` and the callback:
 - a user and no error → signed in
@@ -97,7 +97,8 @@ The exact `@supabase/supabase-js` error classes and status fields are read from 
 - `unavailable`: "Sotus cannot reach sign in right now. Please try again in a moment."
 - In app browser hint (always visible, no user agent sniffing): "Google not loading? Open Sotus in Safari or Chrome."
 - Sign out retry: "We could not sign you out. Please try again."
-- Guarded page unavailable screen: "Sotus cannot check your sign in" with "Please try again in a moment." and a Try again button (the standard `error.tsx` shape from `docs/design.md`).
+- `AuthUnavailable` screen (a shared component in `src/components/auth/`, `Alert tone="problem" announce="assertive"` plus a `secondary` Try again button that takes focus and calls `router.refresh()`): "Sotus cannot check your sign in" with "Please try again in a moment."
+- Normal app error screen (`(app)/error.tsx`, the standard shape from `docs/design.md`, `reset` retry): "Something went wrong" with "Please try again."
 
 **`safeNextPath` algorithm** (pure, `src/lib/auth/safe-next-path.ts`, `(input: unknown) => string`, default `/`):
 1. Before parsing, on the raw value: it must be a string (arrays and undefined fail), at most 2048 characters, start with `/`, not start with `//`, contain no backslash and no control character (U+0000 to U+001F, U+007F).
@@ -155,6 +156,7 @@ Table driven check (a script in `scripts/`, run with Node 24 type stripping, no 
 **Key invariants**:
 - Every protected server entry point calls `requireUser()` itself; no code treats "the proxy ran" or "the layout ran" as proof of a user.
 - Server code identifies the user with `getUser()` or `getClaims()`, never `getSession()` alone (AGENTS.md).
+- Auth unavailable is a typed state rendered explicitly by the guarded layout or page; `error.tsx` is never used for it, so no unrelated error is labelled as an auth failure.
 - Indeterminate is never signed out: no redirect, no cookie write, no sign in bounce on an outage.
 - The proxy redirects only GET and HEAD navigations.
 - `next` is always a same site path after `safeNextPath`, validated at every read and again before every redirect.
@@ -186,6 +188,7 @@ Table driven check (a script in `scripts/`, run with Node 24 type stripping, no 
 - Closed sign up: `signUp`, `signInWithPassword`, `signInWithOtp` and phone sign in from a console fail. Verifies AC-10.
 - Auth boundary: a mutating Server Action called with no session returns `signed_out` and changes nothing; a protected page rendered without the proxy redirects; a non GET request from a signed out client is not redirected by the proxy. Verifies AC-2, AC-8.
 - Outage: simulate Supabase unreachable (block its host in the dev server or pause the project). Signed in cookies stay, the proxy passes through, a guarded page shows the unavailable screen, an action returns `unavailable`, the callback shows the unavailable message. Verifies AC-12.
+- Unrelated error: throw a temporary error from a page inside `(app)` in a production build. It shows "Something went wrong", never the sign in message. Verifies AC-12.
 - Redirect cookies: a redirect produced by the proxy and by the callback still sets the refreshed cookies and carries the supplied cache headers. Verifies AC-2, AC-4.
 - Origins: repeat the happy path on localhost and on a Vercel preview URL, and confirm the Origin and `request.url` rules there. Verifies AC-9.
 
@@ -195,13 +198,14 @@ Approach: Skateboard (scope default). First a thin, usable whole (sign in, priva
 
 1. **Setup checklist**: Google Cloud consent screen and OAuth client, Supabase Google provider, Email and Phone off, Site URL and redirect allow list (see Configuration required). Engineer task, done before step 5 can be tried. Satisfies **AC-9**, **AC-10**.
 2. **Pure helpers with a check script**: `safeNextPath`, `classifyAuthResult`, the origin validators and `messages.ts` (copy, `AuthErrorCode`, `KNOWN_CANCELLATIONS`, starting empty) in `src/lib/auth/`, plus the table driven check script. Satisfies **AC-3**, **AC-7**, **AC-9**, **AC-12**.
-3. **`requireUser()` and the auth response helper**: `src/lib/auth/require-user.ts` (cached, with the page and action wrappers and `AuthUnavailableError`) and `copyAuthResponseState`. Satisfies **AC-8**, **AC-12**.
-4. **Private app layout**: route group `(app)` whose layout calls `requireUser()`, loads the profile and mounts `AppShell`, with an `error.tsx` for the unavailable screen. Move `src/app/page.tsx` into `(app)` and drop its own `<main>`, since `AppShell` provides `<main id="main">`. Satisfies **AC-8**, **AC-12**.
+3. **`requireUser()` and the auth response helper**: `src/lib/auth/require-user.ts` (cached, with the `requirePageUser` and `requireActionUser` wrappers; both return typed results, no error class) and `copyAuthResponseState`. Satisfies **AC-8**, **AC-12**.
+4. **Private app layout**: route group `(app)` whose layout calls `requireUser()`, loads the profile and mounts `AppShell`, rendering the shared `AuthUnavailable` screen instead of its children when the state is `unavailable`, plus a normal app `error.tsx` with generic copy. Move `src/app/page.tsx` into `(app)` and drop its own `<main>`, since `AppShell` provides `<main id="main">`. Satisfies **AC-8**, **AC-12**.
 5. **Sign in thread, end to end**: route group `(auth)` with the `/sign-in` page (outside `AppShell`, per `docs/design.md`), the client `SignInButton` with pending state (inline Google "G" mark, decorative), the always visible hint line, `signInWithGoogle` and `/auth/callback/route.ts` with explicit cookie and header adapters. Satisfies **AC-1**, **AC-3**, **AC-4**, **AC-7**, **AC-9**, **AC-11**.
 6. **Proxy gate**: extend `src/lib/supabase/proxy.ts`: GET/HEAD only redirects (signed out to `/sign-in?next=...`, signed in at `/sign-in` to `next`), indeterminate passes through, public paths exact (`/sign-in`, `/auth/callback`; static files stay excluded by the matcher), redirects built through `copyAuthResponseState`. Update the file's comment that says the redirect is still to come. Satisfies **AC-2**, **AC-4**, **AC-8**, **AC-12**.
 7. **Account menu and Sign out**: `shadcn add dropdown-menu avatar`, apply the "After shadcn add" edits and pass `pnpm check:ui`; `AccountMenu` client component in the `AppHeader` actions slot with the avatar contract and the form outside the menu content; `signOut` Server Action with `scope: "local"` and a typed failure result. Satisfies **AC-5**, **AC-6**.
 8. **States and polish**: problem `Alert` for the three codes, page metadata with `noindex`, 320px and keyboard pass. Satisfies **AC-7**, **AC-11**.
-9. **Verify**: `/check verify sign in` against the real app: real Google sign in at phone width and on a preview URL (with a query in `next`), the captured cancel and deny cases, the outage drill, and the closed sign up checks.
+9. **Rework the unavailable rendering** (after the first build): add `AuthUnavailable`, make `requirePageUser` return the typed result, render the screen in the `(app)` layout and any guarded page, remove `AuthUnavailableError`, and change `(app)/error.tsx` to generic copy. No change to `requireUser()`, the proxy, the callback or the actions. Satisfies **AC-12**.
+10. **Verify**: `/check verify sign in` against the real app: real Google sign in at phone width and on a preview URL (with a query in `next`), the captured cancel and deny cases, the outage drill, and the closed sign up checks.
 
 ## Consequences
 
