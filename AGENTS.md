@@ -17,13 +17,13 @@ library and your own collection, and helps answer "what should I cook today?".
 
 - **Language / Runtime**: TypeScript (strict), Node.js 24 LTS on Vercel (Fluid compute), functions pinned to region `fra1`
 - **Framework**: Next.js 16 App Router (Turbopack), React 19, Server Components first
-- **Key dependencies**: `@supabase/ssr` + `@supabase/supabase-js` (Postgres, Google sign in, RLS), `@google/genai` (Gemini Flash), Tailwind CSS v4 + shadcn/ui (`radix-nova` style, CSS variables), `lucide-react`
+- **Key dependencies**: `@supabase/ssr` + `@supabase/supabase-js` (Postgres, Google sign in, RLS), `@google/genai` (Gemini Flash), Tailwind CSS v4 + shadcn/ui (`radix-nova` style, CSS variables), `lucide-react`, `zod` (boundary schemas), `undici` (behind `safeFetch`), `node-html-parser` (reading recipe pages)
 - **Package manager**: pnpm 10.33.2, pinned with `packageManager`; `pnpm-lock.yaml` is committed
 - **Data and hosting**: one Supabase cloud project, `sotus-dev` (eu-central-1), shared by all three Vercel environments. Do not create a second Supabase project. It pauses when idle, so wake it before a demo.
 
 Mirrored from [docs/specs/0001-stack-architecture/index.md](docs/specs/0001-stack-architecture/index.md),
-which is the source of truth. `zod`, `undici` and Framer Motion are in that spec but not installed
-yet; they arrive with the features that need them.
+which is the source of truth. Framer Motion is in that spec but not installed yet; it arrives with
+the feature that needs it.
 
 ## Build approach
 
@@ -52,6 +52,8 @@ pnpm check:ui
 
 # Auth helper checks (safeNextPath, auth classification, origin rules)
 pnpm check:auth
+# Extraction checks (pure parsing, grounding and YouTube logic; no network)
+pnpm check:extraction
 
 # Format (Prettier; `format:check` only reports)
 pnpm format
@@ -82,7 +84,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title/index.md`, with `rationa
 - **Functional and immutable.** Pure functions by default, `const` and `readonly` data, no shared mutable state, composition over inheritance, no classes where a function works. Side effects live at the edges: Server Actions, route handlers, the Supabase and Gemini clients.
 - **Expected failures return a typed result, never a throw.** Every extraction ends in exactly one of `recipe`, `not_a_recipe`, `insufficient`, `ingestion_failed` (spec 0001's acceptance contract). An unexpected throw is caught at the Server Action edge and becomes `ingestion_failed`. Avoid `null`; use `undefined` in a union.
 - **Server first.** Pages are Server Components. `"use client"` only for real interaction: forms with pending state, menus, motion.
-- **Secrets and env vars.** `GEMINI_API_KEY` is read only in server code, behind `import "server-only"`. Only `NEXT_PUBLIC_` variables reach the browser. Every variable is validated where it is read and throws when absent, the way [src/lib/supabase/env.ts](src/lib/supabase/env.ts) does, so a missing secret fails at boot rather than mid extraction.
+- **Secrets and env vars.** `GEMINI_API_KEY` is read only in server code, behind `import "server-only"`. Only `NEXT_PUBLIC_` variables reach the browser. Every variable is validated where it is read and throws when absent, the way [src/lib/supabase/env.ts](src/lib/supabase/env.ts) does, so a missing secret fails at boot rather than mid extraction. The one exception is `YOUTUBE_API_KEY` (server only): it is read per call so web links keep working without it, and a YouTube paste checks it before reserving quota.
 - **RLS is the security boundary.** Every table has row level security on, the app uses the publishable key plus the user's session, and no service role key. Server code identifies the user with `supabase.auth.getUser()` or `getClaims()`, never `getSession()` alone.
 - **Recipes are written only through `save_recipe`.** The caller signs the payload with `RECIPE_PUBLISH_SECRET` via [src/lib/recipes/sign-payload.ts](src/lib/recipes/sign-payload.ts) (`server-only`); the database checks it against the Vault secret `recipe_publish_secret`. The two values must match. Attempts start with `reserve_ai_attempt`; the error texts map to typed results in [src/lib/ai/attempt-reasons.ts](src/lib/ai/attempt-reasons.ts).
 - **One door for user supplied URLs.** Web page URLs go through `safeFetch` and nothing else fetches them. YouTube links take their own guarded path: parse the video id, rebuild the canonical `https://www.youtube.com/watch?v=<id>` URL, and send only that onward. The pasted URL is never fetched or forwarded.
@@ -130,7 +132,7 @@ User level skills, in `~/.claude/skills/`:
 
 MCP servers: Vercel MCP (connected) · Next.js devtools MCP (built into the Next.js 16 dev server)
 
-Declined: Tailwind v4 docs skills, zod community skills, shadcn community MCP, `vercel/ai@ai-sdk` (teaches the Vercel AI SDK, which this project does not use), Firecrawl skills, Google Agents CLI skills, accessibility and SSRF fetch MCP servers. Nothing credible exists for `@google/genai` or `undici`; spec 0001 carries those conventions instead.
+Declined: Tailwind v4 docs skills, zod community skills, shadcn community MCP, `vercel/ai@ai-sdk` (teaches the Vercel AI SDK, which this project does not use), Firecrawl skills, Google Agents CLI skills, accessibility and SSRF fetch MCP servers, YouTube skills (`zeropointrepo/youtube-skills`, `nessalazne/youtube-agent-skill`, `artemchuikin/youtube-skills`), YouTube MCP servers (`dannySubsense/youtube-mcp-server`, `icraft2170/youtube-data-mcp-server`, `dyay108/youtube-mcp`, Pipedream YouTube Data API), `mindrally/skills@cheerio-parsing` (teaches a different library), Mealie MCP (`rldiao/mealie-mcp`) and the Apify JSON-LD extractor MCP. Nothing exists for `node-html-parser`. Nothing credible exists for `@google/genai` or `undici`; spec 0001 carries those conventions instead.
 
 ## Context files
 
@@ -138,5 +140,7 @@ Declined: Tailwind v4 docs skills, zod community skills, shadcn community MCP, `
 
 - [src/components/AGENTS.md](src/components/AGENTS.md): the edited shadcn primitives in `ui/`, the app shell in `shell/`, and the rules for adding a component
 - [src/lib/auth/AGENTS.md](src/lib/auth/AGENTS.md): Google sign in, the `requireUser()` guard every protected entry point calls, and the `next` and origin rules
+- [src/lib/extraction/AGENTS.md](src/lib/extraction/AGENTS.md): the shared add link pipeline for web pages and YouTube, its deadline, typed failures and the pure modules `check:extraction` covers
+- [src/lib/ai/AGENTS.md](src/lib/ai/AGENTS.md): the Gemini client with its single retry, the attempt (quota) RPC wrappers, and the stored reason list
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

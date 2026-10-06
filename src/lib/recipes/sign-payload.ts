@@ -37,6 +37,12 @@ export type RecipePayload = {
   readonly steps: readonly string[];
 };
 
+/** The payload fields that describe where a recipe came from, set by each source. */
+export type RecipeSourceFields = Pick<
+  RecipePayload,
+  "source_title" | "source_channel_title" | "recipe_page_url"
+>;
+
 export type SignedRecipe = {
   readonly payload: string;
   readonly signature: string;
