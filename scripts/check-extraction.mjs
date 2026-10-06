@@ -1,0 +1,624 @@
+// Table driven check for the pure extraction modules (spec 0006 verify.md). Run with:
+//   node --experimental-strip-types scripts/check-extraction.mjs
+import { parse } from "node-html-parser";
+
+import {
+  classifyGeminiError,
+  classifyGeminiResponse,
+} from "../src/lib/ai/gemini-errors.ts";
+import { acceptModelResponse } from "../src/lib/extraction/contract.ts";
+import { ground, tokensOf } from "../src/lib/extraction/grounding.ts";
+import { checkHop } from "../src/lib/extraction/hop-check.ts";
+import { isYouTubeHost } from "../src/lib/extraction/hosts.ts";
+import { readPageText } from "../src/lib/extraction/page-text.ts";
+import { parseIngredientLine } from "../src/lib/extraction/parse-ingredient-line.ts";
+import { readJsonLd } from "../src/lib/extraction/read-jsonld.ts";
+import {
+  linkInputSchema,
+  providerResponseJsonSchema,
+} from "../src/lib/extraction/schemas.ts";
+import {
+  chooseTitle,
+  pageTitleFallback,
+  readPageTitle,
+  toSourceTitle,
+} from "../src/lib/extraction/titles.ts";
+
+let failures = 0;
+let checks = 0;
+function expect(label, actual, expected) {
+  checks += 1;
+  if (JSON.stringify(actual) === JSON.stringify(expected)) return;
+  failures += 1;
+  console.error(
+    `FAIL ${label}: got ${JSON.stringify(actual)}, want ${JSON.stringify(expected)}`,
+  );
+}
+
+// Link input (AC-1)
+for (const [input, ok] of [
+  ["https://example.com/recipe", true],
+  ["  https://example.com/x  ", true],
+  ["", false],
+  ["   ", false],
+  ["example.com", false],
+  ["ftp://example.com/", false],
+  [`https://example.com/${"a".repeat(2030)}`, false],
+  [`https://example.com/${"é".repeat(1020)}`, false],
+]) {
+  expect(
+    `link ${input.slice(0, 40)}`,
+    linkInputSchema.safeParse(input).success,
+    ok,
+  );
+}
+
+// Host rules
+for (const [input, want] of [
+  ["https://youtube.com/watch?v=x", true],
+  ["https://WWW.YouTube.com./shorts/x", true],
+  ["https://music.youtube.com/watch?v=x", true],
+  ["https://youtu.be/x", true],
+  ["https://notyoutube.com/", false],
+  ["https://youtube.com.evil.example/", false],
+  ["htp:/broken", false],
+  ["", false],
+  ["youtube", false],
+]) {
+  expect(`isYouTubeHost(${input})`, isYouTubeHost(input), want);
+}
+
+// safeFetch hop checks (before DNS)
+for (const [input, want] of [
+  ["https://example.com/recipe", "ok"],
+  ["http://127.0.0.1/", "blocked_url"],
+  ["http://2130706433/", "blocked_url"],
+  ["http://0x7f.1/", "blocked_url"],
+  ["http://[::1]/", "blocked_url"],
+  ["http://[::ffff:127.0.0.1]/", "blocked_url"],
+  ["http://[::ffff:8.8.8.8]/", "ok"],
+  ["http://[2606:4700:4700::1111]/", "ok"],
+  ["http://[fe80::1]/", "blocked_url"],
+  ["http://[fd00::1]/", "blocked_url"],
+  ["http://169.254.169.254/latest/meta-data/", "blocked_url"],
+  ["http://10.0.0.1/", "blocked_url"],
+  ["http://100.64.0.1/", "blocked_url"],
+  ["http://172.16.5.4/", "blocked_url"],
+  ["http://192.168.1.1/", "blocked_url"],
+  ["http://8.8.8.8/", "ok"],
+  ["http://localhost/", "blocked_url"],
+  ["http://a.localhost/", "blocked_url"],
+  ["https://example.com:8443/", "blocked_url"],
+  ["https://example.com:443/", "ok"],
+  ["https://user:pw@example.com/", "blocked_url"],
+  ["ftp://example.com/", "blocked_url"],
+  ["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "blocked_url"],
+]) {
+  expect(`checkHop(${input})`, checkHop(new URL(input)), want);
+}
+
+// Titles
+const titled = (html) => readPageTitle(parse(html));
+expect(
+  "suffix removed",
+  chooseTitle([undefined, pageTitleFallback("Fluffy Pancakes | Serious Eats")]),
+  "Fluffy Pancakes",
+);
+expect(
+  "source title keeps suffix",
+  toSourceTitle(titled("<title>Fluffy Pancakes | Serious Eats</title>")),
+  "Fluffy Pancakes | Serious Eats",
+);
+expect("last separator", pageTitleFallback("Salt - Fat - Acid"), "Salt - Fat");
+expect("nothing left keeps", pageTitleFallback("| Site"), "| Site");
+expect(
+  "og:title wins",
+  titled('<meta property="og:title" content="OG"><title>T</title>'),
+  "OG",
+);
+const spaced = `${"word ".repeat(26)}`.trim(); // 129 code points
+const cutSpaced = chooseTitle([spaced]);
+expect(
+  "cut at space",
+  [cutSpaced.length <= 120, cutSpaced.endsWith("word")],
+  [true, true],
+);
+expect("hard cut", Array.from(chooseTitle(["x".repeat(130)])).length, 120);
+expect(
+  "emoji is one code point",
+  Array.from(chooseTitle(["🍕".repeat(130)])).length,
+  120,
+);
+expect(
+  "source title cut",
+  Array.from(toSourceTitle("y".repeat(400))).length,
+  300,
+);
+expect("all blank", chooseTitle(["  ", undefined, ""]), undefined);
+
+// Ingredient parser
+for (const [line, quantity, unit, name] of [
+  ["2 cups flour, sifted", "2", "cups", "flour, sifted"],
+  ["8 fl oz milk", "8", "fl oz", "milk"],
+  ["200g flour", "200", "g", "flour"],
+  ["1½ tsp salt", "1 1/2", "tsp", "salt"],
+  ["3 Tbsp. butter", "3", "Tbsp", "butter"],
+  ["2-3 cloves garlic", "2-3", "cloves", "garlic"],
+  ["2 to 3 tbsp olive oil", "2 to 3", "tbsp", "olive oil"],
+  ["0,5 l water", "0,5", "l", "water"],
+  ["1 cup of sugar", "1", "cup", "sugar"],
+  ["2 eggs", "2", undefined, "eggs"],
+  ["Salt to taste", undefined, undefined, "Salt to taste"],
+  ["1 (14 oz) can tomatoes", "1", undefined, "(14 oz) can tomatoes"],
+  ["2 cups", undefined, undefined, "2 cups"],
+  [
+    `${"1".repeat(41)} g flour`,
+    undefined,
+    undefined,
+    `${"1".repeat(41)} g flour`,
+  ],
+]) {
+  const parsed = parseIngredientLine(line);
+  expect(
+    `parse(${line.slice(0, 30)})`,
+    [parsed.quantity, parsed.unit, parsed.name],
+    [quantity, unit, name],
+  );
+}
+
+// JSON-LD reader
+const page = (...scripts) =>
+  parse(
+    `<html><head><title>Page | Site</title>${scripts
+      .map((body) => `<script type="application/ld+json">${body}</script>`)
+      .join("")}</head><body></body></html>`,
+  );
+const recipe = (extra = {}) => ({
+  "@type": "Recipe",
+  name: "Pancakes",
+  recipeIngredient: ["2 cups flour", "1 egg"],
+  recipeInstructions: [{ "@type": "HowToStep", text: "Mix." }],
+  ...extra,
+});
+const read = (root) => readJsonLd(root, readPageTitle(root));
+const usable = (result) => result.found && !result.multiple && result.usable;
+
+expect(
+  "@graph with type array",
+  usable(
+    read(
+      page(
+        JSON.stringify({
+          "@graph": [
+            { "@type": "WebSite" },
+            recipe({ "@type": ["Recipe", "NewsArticle"] }),
+          ],
+        }),
+      ),
+    ),
+  ),
+  true,
+);
+expect(
+  "WebPage.mainEntity",
+  usable(
+    read(page(JSON.stringify({ "@type": "WebPage", mainEntity: recipe() }))),
+  ),
+  true,
+);
+const stringSteps = read(
+  page(
+    JSON.stringify(
+      recipe({ recipeInstructions: "Mix the flour.<br>Add egg.<p>Bake.</p>" }),
+    ),
+  ),
+);
+expect("string instructions split", stringSteps.recipe?.steps, [
+  "Mix the flour.",
+  "Add egg.",
+  "Bake.",
+]);
+expect(
+  "single HowToStep object",
+  read(
+    page(
+      JSON.stringify(
+        recipe({
+          recipeInstructions: { "@type": "HowToStep", text: "Only step." },
+        }),
+      ),
+    ),
+  ).recipe?.steps,
+  ["Only step."],
+);
+expect(
+  "HowToSection single object",
+  read(
+    page(
+      JSON.stringify(
+        recipe({
+          recipeInstructions: [
+            {
+              "@type": "HowToSection",
+              name: "Batter",
+              itemListElement: { "@type": "HowToStep", text: "Whisk." },
+            },
+          ],
+        }),
+      ),
+    ),
+  ).recipe?.steps,
+  ["Whisk."],
+);
+const singleIngredient = read(
+  page(JSON.stringify(recipe({ recipeIngredient: "2 cups flour" }))),
+);
+expect(
+  "single ingredient string is unusable",
+  [singleIngredient.found, singleIngredient.usable],
+  [true, false],
+);
+expect(
+  "blank entries dropped",
+  read(
+    page(
+      JSON.stringify(
+        recipe({
+          recipeIngredient: ["2 cups flour", " ", "1 egg"],
+          recipeInstructions: ["", "1. Mix."],
+        }),
+      ),
+    ),
+  ).recipe,
+  {
+    title: "Pancakes",
+    ingredients: [
+      { name: "flour", quantity: "2", unit: "cups" },
+      { name: "egg", quantity: "1" },
+    ],
+    steps: ["Mix."],
+  },
+);
+expect(
+  "duplicate recipe collapses",
+  usable(read(page(JSON.stringify(recipe()), JSON.stringify(recipe())))),
+  true,
+);
+expect(
+  "two distinct recipes",
+  read(page(JSON.stringify([recipe(), recipe({ name: "Waffles" })]))),
+  { found: true, multiple: true },
+);
+expect(
+  "raw newline, comment and CDATA wrappers",
+  [
+    usable(read(page(JSON.stringify(recipe()).replace("Mix.", "Mix\nwell.")))),
+    usable(read(page(`<!--${JSON.stringify(recipe())}-->`))),
+    usable(read(page(`<![CDATA[${JSON.stringify(recipe())}]]>`))),
+  ],
+  [true, true, true],
+);
+expect(
+  "invalid script skipped",
+  usable(read(page("{not json", JSON.stringify(recipe())))),
+  true,
+);
+const longStep = read(
+  page(JSON.stringify(recipe({ recipeInstructions: ["x".repeat(1001)] }))),
+);
+expect(
+  "step over 1000 is unusable",
+  [longStep.found, longStep.usable],
+  [true, false],
+);
+const entities = read(
+  page(
+    JSON.stringify(
+      recipe({
+        name: "Mac &amp; Cheese&#8217;s",
+        recipeInstructions: ['Stir <a href="/x">well</a>.'],
+      }),
+    ),
+  ),
+);
+expect(
+  "entities and tags",
+  [entities.recipe?.title, entities.recipe?.steps],
+  ["Mac & Cheese’s", ["Stir well."]],
+);
+expect("no JSON-LD", read(page()), { found: false });
+expect(
+  "blank name falls back to page title",
+  read(page(JSON.stringify(recipe({ name: "" })))).recipe?.title,
+  "Page",
+);
+
+// Page text
+const longStory = "Story line about my grandmother and her kitchen. ".repeat(
+  10,
+);
+const pageText = readPageText(
+  parse(
+    `<body><nav>Menu</nav><header>Head</header><aside>Ad</aside><footer>Foot</footer>
+     <script>var x</script><style>p{}</style><div hidden>Secret</div>
+     <form><input> Join our newsletter</form>
+     <article><h1>Soup</h1><p>${longStory}</p><ul><li>2 cups water</li></ul></article></body>`,
+  ),
+);
+const joined = pageText.lines.join("\n");
+expect(
+  "stripped elements gone",
+  ["Menu", "Head", "Ad", "Foot", "var x", "Secret", "newsletter"].some((word) =>
+    joined.includes(word),
+  ),
+  false,
+);
+expect("article kept", pageText.lines.includes("2 cups water"), true);
+const formPage = readPageText(
+  parse(`<body><form><p>${longStory}</p><p>2 eggs</p></form></body>`),
+);
+expect("big form keeps content", formPage.lines.includes("2 eggs"), true);
+const bigLines = Array.from(
+  { length: 2000 },
+  (_, index) => `<p>line ${index} ${"z".repeat(40)}</p>`,
+).join("");
+const bigText = readPageText(
+  parse(`<body>${bigLines}<p>RECIPE CARD 2 cups flour</p></body>`),
+);
+expect(
+  "long page keeps head and tail",
+  [
+    bigText.trimmed,
+    bigText.lines[0]?.startsWith("line 0 "),
+    bigText.lines.at(-1),
+    bigText.chars <= 60_001,
+  ],
+  [true, true, "RECIPE CARD 2 cups flour", true],
+);
+expect(
+  "short page under 300",
+  readPageText(parse(`<body><p>${"a".repeat(250)}</p></body>`)).chars < 300,
+  true,
+);
+
+// Grounding
+expect("oil is not boil", tokensOf("boil").includes("oil"), false);
+expect("crème stays one token", tokensOf("Crème fraîche"), [
+  "crème",
+  "fraîche",
+]);
+const source = [
+  "Pancakes",
+  "2 cups flour",
+  "1 egg",
+  "Mix and bake for 20 minutes.",
+];
+expect(
+  "amount on another line is cleared",
+  ground(
+    {
+      ingredients: [
+        { name: "flour", quantity: "1", unit: "cup" },
+        { name: "egg", quantity: "1" },
+      ],
+      steps: ["Mix."],
+    },
+    source,
+  ),
+  {
+    grounded: true,
+    ingredients: [{ name: "flour" }, { name: "egg", quantity: "1" }],
+    steps: ["Mix."],
+    droppedIngredients: 0,
+    clearedAmounts: 1,
+  },
+);
+expect(
+  "unstated number in step",
+  ground(
+    {
+      ingredients: [{ name: "flour" }, { name: "egg" }],
+      steps: ["Bake 25 minutes."],
+    },
+    source,
+  ).grounded,
+  false,
+);
+expect(
+  "dropped ingredient in step",
+  ground(
+    {
+      ingredients: [{ name: "flour" }, { name: "egg" }, { name: "saffron" }],
+      steps: ["Add saffron."],
+    },
+    source,
+  ),
+  {
+    grounded: false,
+    reason: "ungrounded_step",
+    droppedIngredients: 1,
+    clearedAmounts: 0,
+  },
+);
+expect(
+  "half equals 1/2",
+  ground({ ingredients: [], steps: ["Use half."] }, ["1/2 cup"]).grounded,
+  true,
+);
+
+// Model output order (AC-8)
+const accept = (response) =>
+  acceptModelResponse(response, {
+    method: "web_model",
+    sourceLines: source,
+    titleAfter: "Pancakes",
+  }).result;
+expect(
+  "one ingredient is insufficient",
+  accept({
+    outcome: "recipe",
+    title: "Pancakes",
+    ingredients: [{ name: "flour" }],
+    steps: ["Mix."],
+  }),
+  { outcome: "insufficient", reason: "missing_ingredients" },
+);
+expect(
+  "name over 120 is invalid output",
+  accept({
+    outcome: "recipe",
+    ingredients: [{ name: "f".repeat(121) }, { name: "egg" }],
+    steps: ["Mix."],
+  }),
+  { outcome: "ingestion_failed", reason: "invalid_model_output" },
+);
+expect(
+  "ungrounded step",
+  accept({
+    outcome: "recipe",
+    ingredients: [{ name: "flour" }, { name: "egg" }],
+    steps: ["Bake 25 minutes."],
+  }),
+  { outcome: "insufficient", reason: "ungrounded_step" },
+);
+expect("not a recipe", accept({ outcome: "not_a_recipe" }), {
+  outcome: "not_a_recipe",
+  reason: "not_a_recipe",
+});
+expect(
+  "insufficient keeps model reason",
+  accept({ outcome: "insufficient", reason: "multiple_recipes" }),
+  { outcome: "insufficient", reason: "multiple_recipes" },
+);
+expect(
+  "insufficient derives reason",
+  accept({
+    outcome: "insufficient",
+    reason: "other",
+    ingredients: [{ name: "a" }, { name: "b" }],
+  }),
+  { outcome: "insufficient", reason: "missing_steps" },
+);
+expect(
+  "grounded recipe accepted",
+  accept({
+    outcome: "recipe",
+    ingredients: [
+      { name: "flour", quantity: "2", unit: "cups" },
+      { name: "egg" },
+    ],
+    steps: ["1. Mix and bake for 20 minutes."],
+  }),
+  {
+    outcome: "recipe",
+    recipe: {
+      title: "Pancakes",
+      ingredients: [
+        { name: "flour", quantity: "2", unit: "cups" },
+        { name: "egg" },
+      ],
+      steps: ["Mix and bake for 20 minutes."],
+    },
+    method: "web_model",
+  },
+);
+
+// Gemini failure mapping (AC-9)
+const apiError = (status, message = "x") =>
+  Object.assign(new Error(message), { status });
+const dailyQuota = JSON.stringify({
+  error: {
+    details: [
+      {
+        "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+        violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel" }],
+      },
+    ],
+  },
+});
+const mapped = (error, aborted = false) => {
+  const { reason, retry } = classifyGeminiError(error, aborted);
+  return [reason, retry];
+};
+expect("429 per day", mapped(apiError(429, `got 429. ${dailyQuota}`)), [
+  "provider_error",
+  false,
+]);
+for (const status of [429, 500, 502, 503, 504]) {
+  expect(`http ${status}`, mapped(apiError(status)), ["provider_error", true]);
+}
+expect(
+  "network error",
+  mapped(
+    Object.assign(new TypeError("fetch failed"), {
+      cause: { code: "ECONNRESET" },
+    }),
+  ),
+  ["provider_error", true],
+);
+expect("abort", mapped(Object.assign(new Error("a"), { name: "AbortError" })), [
+  "timeout",
+  false,
+]);
+expect("aborted signal", mapped(apiError(503), true), ["timeout", false]);
+for (const status of [400, 401, 403, 404]) {
+  expect(`http ${status}`, mapped(apiError(status)), [
+    "provider_rejected",
+    false,
+  ]);
+}
+expect("other status", mapped(apiError(418)), ["provider_error", false]);
+const responseReason = (response) =>
+  classifyGeminiResponse(response).reason ?? "ok";
+expect(
+  "prompt blocked",
+  responseReason({ promptFeedback: { blockReason: "SAFETY" } }),
+  "model_blocked",
+);
+for (const finishReason of [
+  "SAFETY",
+  "RECITATION",
+  "BLOCKLIST",
+  "PROHIBITED_CONTENT",
+  "SPII",
+]) {
+  expect(
+    `finish ${finishReason}`,
+    responseReason({ candidates: [{ finishReason }], text: "{}" }),
+    "model_blocked",
+  );
+}
+expect(
+  "max tokens",
+  responseReason({ candidates: [{ finishReason: "MAX_TOKENS" }], text: "{" }),
+  "invalid_model_output",
+);
+expect(
+  "no candidates",
+  responseReason({ candidates: [] }),
+  "invalid_model_output",
+);
+expect(
+  "empty text",
+  responseReason({ candidates: [{ finishReason: "STOP" }], text: "" }),
+  "invalid_model_output",
+);
+expect(
+  "good response",
+  responseReason({ candidates: [{ finishReason: "STOP" }], text: "{}" }),
+  "ok",
+);
+
+// Provider schema stays inside Gemini's subset
+const schemaText = JSON.stringify(providerResponseJsonSchema);
+expect(
+  "no $schema or additionalProperties",
+  [schemaText.includes("$schema"), schemaText.includes("additionalProperties")],
+  [false, false],
+);
+
+if (failures > 0) {
+  console.error(`${failures} of ${checks} extraction checks failed`);
+  process.exit(1);
+}
+console.log(`extraction checks passed (${checks})`);
