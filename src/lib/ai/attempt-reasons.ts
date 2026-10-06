@@ -24,9 +24,32 @@ export const ATTEMPT_REASONS = [
   "not_a_recipe",
   "already_saved",
   "save_failed",
+  "site_blocked",
+  "page_not_found",
+  "fetch_failed",
+  "too_many_redirects",
+  "too_large",
+  "unsupported_content",
+  "page_unreadable",
+  "provider_rejected",
+  "model_blocked",
+  "multiple_recipes",
+  "missing_title",
+  "internal_error",
 ] as const;
 
 export type AttemptReason = (typeof ATTEMPT_REASONS)[number];
+
+/**
+ * What the add form can receive: every stored reason, plus four that are never stored
+ * because no attempt row exists when they happen.
+ */
+export type ActionReason =
+  | AttemptReason
+  | "invalid_link"
+  | "signed_out"
+  | "unavailable"
+  | "service_unavailable";
 
 export type IngestionFailed = {
   readonly outcome: "ingestion_failed";
@@ -47,7 +70,23 @@ const reasonByDatabaseError: ReadonlyMap<string, AttemptReason> = new Map([
   ["recipe_not_resolved", "save_failed"],
 ]);
 
-/** Any database error, known or not, ends an extraction as `ingestion_failed`. */
+export type PreAttemptReason =
+  "quota_exceeded" | "blocked_url" | "service_unavailable";
+
+/**
+ * Before an attempt row exists (`open_existing_recipe`, `reserve_ai_attempt`) there is
+ * nothing to finish, so anything unexpected, including a transport error, means the
+ * database is out of reach rather than a failed extraction.
+ */
+export function reasonBeforeAttempt(
+  error: { readonly message: string } | undefined,
+): PreAttemptReason {
+  if (error?.message === "quota_exceeded") return "quota_exceeded";
+  if (error?.message === "invalid_source_url") return "blocked_url";
+  return "service_unavailable";
+}
+
+/** Only for `save_recipe`: any database error, known or not, ends as `ingestion_failed`. */
 export function ingestionFailedFromDatabaseError(
   error: { readonly message: string } | undefined,
 ): IngestionFailed {

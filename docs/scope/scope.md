@@ -18,7 +18,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
 | 5 | Sign in | Release 1 | in-progress |
-| 6 | Recipe from a web page link | Release 1 | planned |
+| 6 | Recipe from a web page link | Release 1 | done |
 | 7 | Recipe from a YouTube link | Release 1 | in-progress |
 | 8 | Recipe page | Release 1 | planned |
 | 9 | Shared recipe library | Release 1 | planned |
@@ -85,23 +85,30 @@ spec [0005](../specs/0005-sign-in/index.md) · code in `src/lib/auth/`, `src/app
   - [x] Account menu, Sign out and states (AC-5, AC-6, AC-7, AC-11)
 - [ ] Verify it: `/check verify sign in`
 
-### 6. Recipe from a web page link · needs a decision
+### 6. Recipe from a web page link · done
 Paste a recipe page link and get a structured recipe (title, ingredients with amounts, steps, source). Simplest source, so it proves the extraction contract first.
 **Done when:** pasting a typical recipe page link produces a saved recipe with ingredients and steps in under a minute, and a non recipe or broken link shows a clear message.
-- [ ] Design it (spec): `/architect recipe from a web page link`
+spec [0006](../specs/0006-recipe-from-web-page-link/index.md) · builds the shared base for #7 and ships together with #7 slice 1 · code in `src/lib/extraction/`
+- [x] Design it (spec): `/architect recipe from a web page link`
+- [x] Build it: `/develop recipe from a web page link`
+  - [x] Slice A foundations: dependencies, reasons and messages, schemas, deadline, host rules and `safeFetch`, title, JSON-LD and ingredient readers, `pnpm check:extraction` (AC-1, AC-4, AC-5, AC-10, AC-11, AC-15, AC-17)
+  - [x] Slice A thread: `addRecipeFromLink` with auth, dedup, quota and signed save, the "Add a link" form, the minimal recipe page (AC-1 to AC-3, AC-11 to AC-14, AC-16, AC-17)
+  - [x] Slice B: page text, Gemini client and failure mapping, grounding, the fallback wired in (AC-6 to AC-10)
+  - [x] Slice C: #7 slice 1 plugged into the same router (AC-15)
+- [x] Verify it, together with #7 slice 1: `/check verify recipe from a web page link`
 
 ### 7. Recipe from a YouTube link · in-progress
 Paste a YouTube video or Short and get the same structured recipe, so the recipe is no longer buried in the video. The headline demo moment.
 **Done when:** pasting a YouTube cooking video or Short produces a saved recipe linked to the video; a video with no usable recipe content shows a clear message instead of a made up recipe.
-spec [0002](../specs/0002-recipe-from-youtube-link/index.md) · builds after #3 and #6
+spec [0002](../specs/0002-recipe-from-youtube-link/index.md) · builds after #3 and #6 · code in `src/lib/extraction/youtube/`
 - [x] Design it (spec): `/architect recipe from a youtube link`
 - [ ] Build it: `/develop recipe from a youtube link`
-  - [ ] Slice 1 foundations: YouTube key, link parsing and routing, duplicate check, Data API metadata (AC-1, AC-2, AC-3, AC-8, AC-13)
-  - [ ] Slice 1 extraction: grounding, creator page, description step, orchestration and save (AC-4 to AC-7, AC-9, AC-11, AC-12)
-  - [ ] Slice 1 UI: pending state, messages, provenance line and notice (AC-10)
+  - [x] Slice 1 foundations: YouTube key, link parsing and routing, duplicate check, Data API metadata (AC-1, AC-2, AC-3, AC-8, AC-13)
+  - [x] Slice 1 extraction: grounding, creator page, description step, orchestration and save (AC-4 to AC-7, AC-9, AC-11, AC-12)
+  - [x] Slice 1 UI: pending state, messages, provenance line and notice (AC-10)
   - [ ] Spike 2: grounded transcript on the five videos, evidence in spec 0002 (gates slice 2)
   - [ ] Slice 2: grounded transcript step, only if spike 2 passes (AC-14 to AC-16)
-- [ ] Verify it: `/check verify recipe from a youtube link`
+- [x] Verify it: `/check verify recipe from a youtube link`
 
 ### 8. Recipe page
 One readable, cook friendly view of a recipe: ingredients, steps, source link, who added it.
@@ -166,6 +173,8 @@ Out of scope for the demo, kept so the plan stays honest.
 - **Email magic link sign in**: for demo viewers without a Google account; needs a real email sender · from spec 0005 · needs a decision
 - **YouTube API data policy check**: confirm how long video titles and channel names may be stored before any public launch · from spec 0002
 - **YouTube metadata refresh or clear job**: refresh or clear `source_title` / `source_channel_title` past the allowed age, using `source_metadata_fetched_at`; launch gate · from spec 0003
+- **Recipe images for web recipes**: needs a column and a decision on hotlinking unknown hosts · from spec 0006 · needs a decision
+- **Microdata recipe reader**: only if #10 shows many pages without JSON-LD · from spec 0006
 - **Admin fix path for canonical recipes**: correct, re-extract or remove a library recipe (users can't); launch gate · from spec 0003 · needs a decision
 
 ## Legend
