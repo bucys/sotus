@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "check:ui": "node scripts/check-ui-classes.mjs"
+    "check:ui": "node scripts/check-ui-classes.mjs",
+    "check:auth": "node --experimental-strip-types scripts/check-auth-helpers.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

@@ -13,11 +13,11 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
-| 1 | Stack & architecture | Foundation | in-progress |
+| 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
-| 5 | Sign in | Release 1 | planned |
+| 5 | Sign in | Release 1 | in-progress |
 | 6 | Recipe from a web page link | Release 1 | planned |
 | 7 | Recipe from a YouTube link | Release 1 | in-progress |
 | 8 | Recipe page | Release 1 | planned |
@@ -30,14 +30,14 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## Foundations
 
-### 1. Stack & architecture · in-progress
+### 1. Stack & architecture · done
 Decide the web stack, hosting, sign in approach, and AI provider, then scaffold a runnable project that deploys to a public URL.
 **Done when:** the stack is recorded in a spec, and the empty scaffold runs locally, builds clean, and is live at a shareable URL.
 spec [0001](../specs/0001-stack-architecture/index.md) · code in `src/`, `supabase/`, `scripts/`
 - [x] Decide the stack (spec): `/architect stack & architecture`
 - [x] Scaffold from the decision: `/develop stack & architecture`
   - [x] Gemini YouTube feasibility spike, evidence recorded in spec 0001 `rationale.md` (gates #7, not the scaffold). Ran 2026-09-27, verdict **Fail** on grounding; superseded for #7 by spec [0002](../specs/0002-recipe-from-youtube-link/index.md).
-- [ ] Verify it: `/check verify stack & architecture`
+- [x] Verify it: `/check verify stack & architecture`
 
 ### 2. Coding standards & tooling
 Capture conventions from the real scaffold, then install lint, format, and type checks so every later feature follows them.
@@ -73,10 +73,17 @@ spec [0004](../specs/0004-design-system-ui-foundation/index.md)
 
 The smallest usable Sotus: sign in, paste a link, get a clean recipe everyone can see.
 
-### 5. Sign in · needs a decision
+### 5. Sign in · in-progress
 Simple sign in so recipes have an owner and the app knows whose collection is whose.
 **Done when:** a person can sign up, sign in, and sign out on a phone; signed out visitors are sent to sign in.
-- [ ] Design it (spec): `/architect sign in`
+spec [0005](../specs/0005-sign-in/index.md) · code in `src/lib/auth/`, `src/app/(auth)/`, `src/app/(app)/`, `src/app/auth/`, `src/components/auth/`
+- [x] Design it (spec): `/architect sign in`
+- [ ] Build it: `/develop sign in`
+  - [ ] Setup, helpers and `requireUser()` (code done; the Google and Supabase dashboard setup is still yours to do): Google and Supabase settings, `safeNextPath`, auth classification, one guard for every protected entry point (AC-3, AC-7 to AC-10, AC-12)
+  - [x] Sign in thread: private `(app)` layout, `/sign-in`, Server Action, `/auth/callback` (AC-1, AC-3, AC-4, AC-7, AC-8, AC-9, AC-11, AC-12)
+  - [x] Proxy gate: GET and HEAD redirects, outage pass through, cookie preserving redirects (AC-2, AC-4, AC-8, AC-12)
+  - [x] Account menu, Sign out and states (AC-5, AC-6, AC-7, AC-11)
+- [ ] Verify it: `/check verify sign in`
 
 ### 6. Recipe from a web page link · needs a decision
 Paste a recipe page link and get a structured recipe (title, ingredients with amounts, steps, source). Simplest source, so it proves the extraction contract first.
@@ -154,7 +161,9 @@ Out of scope for the demo, kept so the plan stays honest.
 - **Native mobile app with share sheet capture** · needs a decision
 - **Public landing page with SEO**
 - **Usage analytics** · needs a decision
-- **Privacy and terms page**
+- **Privacy and terms page**: add before real public users; Google account data is stored in the EU region · from spec 0005
+- **Delete my account**: needs a server side admin step, which conflicts with no service role key, so design it first · from spec 0005 · needs a decision
+- **Email magic link sign in**: for demo viewers without a Google account; needs a real email sender · from spec 0005 · needs a decision
 - **YouTube API data policy check**: confirm how long video titles and channel names may be stored before any public launch · from spec 0002
 - **YouTube metadata refresh or clear job**: refresh or clear `source_title` / `source_channel_title` past the allowed age, using `source_metadata_fetched_at`; launch gate · from spec 0003
 - **Admin fix path for canonical recipes**: correct, re-extract or remove a library recipe (users can't); launch gate · from spec 0003 · needs a decision
