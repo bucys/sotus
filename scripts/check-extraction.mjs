@@ -23,6 +23,21 @@ import {
   readPageTitle,
   toSourceTitle,
 } from "../src/lib/extraction/titles.ts";
+import {
+  creatorLinks,
+  sharesTitleWord,
+} from "../src/lib/extraction/youtube/creator-links.ts";
+import {
+  descriptionLines,
+  finalLadderReason,
+  hasDescriptionText,
+} from "../src/lib/extraction/youtube/ladder.ts";
+import { parseYouTubeUrl } from "../src/lib/extraction/youtube/parse-youtube-url.ts";
+import {
+  durationSeconds,
+  toVideoDetails,
+  videosListSchema,
+} from "../src/lib/extraction/youtube/video-details.ts";
 
 let failures = 0;
 let checks = 0;
@@ -607,6 +622,210 @@ expect(
   "good response",
   responseReason({ candidates: [{ finishReason: "STOP" }], text: "{}" }),
   "ok",
+);
+
+// YouTube link forms (0002 AC-1, AC-2)
+const ID = "dQw4w9WgXcQ";
+const CANONICAL = `https://www.youtube.com/watch?v=${ID}`;
+for (const [input, want] of [
+  [`https://www.youtube.com/watch?v=${ID}`, CANONICAL],
+  [`https://youtube.com/watch?v=${ID}&t=30`, CANONICAL],
+  [`https://m.youtube.com/watch?v=${ID}&t=30`, CANONICAL],
+  [`http://www.youtube.com/watch?feature=share&v=${ID}`, CANONICAL],
+  [`https://youtu.be/${ID}?si=abc123`, CANONICAL],
+  [`https://www.youtube.com/shorts/${ID}`, CANONICAL],
+  [`https://youtube.com/shorts/${ID}?si=xyz`, CANONICAL],
+  [`https://YouTube.com./watch?v=${ID}`, CANONICAL],
+  ["https://www.youtube.com/@channel", undefined],
+  [`https://www.youtube.com/embed/${ID}`, undefined],
+  [`https://www.youtube.com/live/${ID}`, undefined],
+  ["https://www.youtube.com/playlist?list=PL123", undefined],
+  ["https://www.youtube.com/watch?v=short", undefined],
+  [`https://www.youtube.com/watch?v=${ID}x`, undefined],
+  ["https://youtu.be/", undefined],
+  [`https://music.youtube.com/watch?v=${ID}`, undefined],
+  [`https://www.youtube.com/channel/${ID}`, undefined],
+]) {
+  expect(`youtube ${input}`, parseYouTubeUrl(input)?.canonicalUrl, want);
+}
+
+// Data API duration and watchability (0002 *Watchability*)
+for (const [input, want] of [
+  ["PT1H2M3S", 3723],
+  ["PT45S", 45],
+  ["PT20M", 1200],
+  ["P1DT2H", 93600],
+  ["P0D", 0],
+  ["PT", undefined],
+  ["", undefined],
+  [undefined, undefined],
+  ["1:20", undefined],
+]) {
+  expect(`duration ${input}`, durationSeconds(input), want);
+}
+const item = (overrides = {}) => ({
+  snippet: {
+    title: " Miso Soup ",
+    description: "d",
+    channelTitle: "Chef",
+    liveBroadcastContent: "none",
+    ...overrides.snippet,
+  },
+  contentDetails: { duration: "PT5M", ...overrides.contentDetails },
+  status: { privacyStatus: "public", ...overrides.status },
+});
+const details = (items) => toVideoDetails(videosListSchema.parse({ items }));
+expect("video empty", details([]).available, false);
+expect(
+  "video live",
+  details([item({ snippet: { liveBroadcastContent: "live" } })]).available,
+  false,
+);
+expect(
+  "video upcoming",
+  details([item({ snippet: { liveBroadcastContent: "upcoming" } })]).available,
+  false,
+);
+expect("video title trimmed", details([item()]).video?.title, "Miso Soup");
+for (const [label, overrides, want] of [
+  ["public short", {}, "watchable"],
+  [
+    "unlisted",
+    { status: { privacyStatus: "unlisted" } },
+    "video_not_watchable",
+  ],
+  [
+    "age restricted",
+    { contentDetails: { contentRating: { ytRating: "ytAgeRestricted" } } },
+    "video_not_watchable",
+  ],
+  [
+    "region restricted",
+    { contentDetails: { regionRestriction: { blocked: ["DE"] } } },
+    "video_not_watchable",
+  ],
+  ["21 minutes", { contentDetails: { duration: "PT21M" } }, "video_too_long"],
+  ["20 minutes", { contentDetails: { duration: "PT20M" } }, "watchable"],
+]) {
+  expect(
+    `watchability ${label}`,
+    details([item(overrides)]).video?.watchability,
+    want,
+  );
+}
+
+// Creator page links (0002 *Step 1*, AC-4)
+expect(
+  "creator links: deny list, dedup, path first",
+  creatorLinks(
+    [
+      "Full recipe: https://www.example.com/ (home)",
+      "Recipe → https://cook.example.org/recipes/miso-soup.",
+      "Again https://cook.example.org/recipes/miso-soup",
+      "https://www.instagram.com/chef https://youtu.be/abc https://www.pinterest.co.uk/x",
+      "https://smile.amazon.de/dp/1 https://amzn.to/x https://bit.ly/y https://linktr.ee/z",
+      "https://m.facebook.com/chef https://music.youtube.com/x",
+      "Shop: https://shop.example.net/knife)",
+    ].join("\n"),
+  ),
+  [
+    "https://cook.example.org/recipes/miso-soup",
+    "https://shop.example.net/knife",
+    "https://www.example.com/",
+  ],
+);
+expect("creator links none", creatorLinks("no links here"), []);
+for (const [name, video, want] of [
+  ["White Miso Soup", "Easy Miso Soup in 10 Minutes", true],
+  ["Best Lasagna Ever", "Grandma's Sunday Special", false],
+  ["The Easy Recipe", "The Best Easy Recipe Video", false],
+  ["Roasted Tomatoes", "Roasted tomato salad", true],
+  [undefined, "Miso Soup", false],
+]) {
+  expect(
+    `title overlap ${name} / ${video}`,
+    sharesTitleWord(name, video),
+    want,
+  );
+}
+
+// Ladder (0002 *Ladder rules*, AC-7)
+expect(
+  "description under 100 chars after links",
+  hasDescriptionText(`${"x".repeat(60)} https://example.com/${"y".repeat(80)}`),
+  false,
+);
+expect("description of 100 chars", hasDescriptionText("x".repeat(100)), true);
+expect(
+  "description cut to 60,000",
+  descriptionLines("a".repeat(60_010)).join("").length,
+  60_000,
+);
+expect("ladder nothing seen", finalLadderReason([]), "no_written_recipe");
+expect(
+  "ladder partial",
+  finalLadderReason(["ungrounded_step", "missing_steps"]),
+  "missing_steps",
+);
+expect(
+  "ladder ignores other reasons",
+  finalLadderReason(["multiple_recipes"]),
+  "no_written_recipe",
+);
+
+// Grounding on a YouTube description with chapter timestamps (0002 AC-6)
+const description = [
+  "Miso Soup",
+  "0:25 Bake",
+  "2 tbsp white miso",
+  "1 block tofu",
+  "Water",
+  "Stir the miso into the hot water.",
+];
+expect(
+  "timestamp line does not ground a number",
+  ground(
+    {
+      ingredients: [{ name: "white miso" }, { name: "tofu" }],
+      steps: ["Bake 25 minutes."],
+    },
+    description,
+  ).grounded,
+  false,
+);
+expect(
+  "amount on another line is cleared",
+  ground(
+    {
+      ingredients: [
+        { name: "tofu", quantity: "2", unit: "tbsp" },
+        { name: "white miso", quantity: "2", unit: "tbsp" },
+      ],
+      steps: ["Stir the miso into the water."],
+    },
+    description,
+  ),
+  {
+    grounded: true,
+    ingredients: [
+      { name: "tofu" },
+      { name: "white miso", quantity: "2", unit: "tbsp" },
+    ],
+    steps: ["Stir the miso into the water."],
+    droppedIngredients: 0,
+    clearedAmounts: 1,
+  },
+);
+expect(
+  '"oil" is not grounded by "boil"',
+  ground(
+    {
+      ingredients: [{ name: "oil" }, { name: "tofu" }],
+      steps: ["Boil water."],
+    },
+    ["Boil the tofu"],
+  ).ingredients,
+  [{ name: "tofu" }],
 );
 
 // Provider schema stays inside Gemini's subset

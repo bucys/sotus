@@ -6,6 +6,9 @@ export const STEP_BUDGET_MS = {
   authAndDedup: 2_000,
   fetch: 8_000,
   gemini: 30_000,
+  youtubeMetadata: 3_000,
+  creatorPage: 8_000,
+  youtubeDescription: 12_000,
 } as const;
 
 export type Deadline = {

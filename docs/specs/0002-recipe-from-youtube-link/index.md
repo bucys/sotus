@@ -276,15 +276,15 @@ Skateboard: slice 1 is a usable YouTube feature on its own (creator page plus de
 
 **Slice 1: text sources**
 
-1. Enable the YouTube Data API v3, create the restricted `YOUTUBE_API_KEY`, add it to Vercel and `.env.local`, list it in `.env.example`, validate it in a `server-only` env reader, satisfies **AC-5**
-2. `parse-youtube-url.ts` and `isYouTubeHost` (pure) plus host routing in `addRecipeFromLink`, satisfies **AC-1**, **AC-2**
-3. `open_existing_recipe` before reservation, and the `out_created: false` redirect after `save_recipe`, satisfies **AC-3**, **AC-13**
-4. `youtube-metadata.ts`: `videos.list` with zod parsing, the watchability table, the step budget, and key free error logging, satisfies **AC-8**, **AC-9**, **AC-11**
-5. `grounding.ts` (pure): source cleaning, tokens and `singular()`, number values, names, same segment quantity and unit, step numbers and `ungrounded_step`, then recheck the contract; reuse it in #6's page text path, satisfies **AC-6**
-6. `creator-page.ts`: link harvest, deny list, ranking, 2 parallel `safeFetch` + JSON-LD, title overlap with `STOP_WORDS`, satisfies **AC-4**
-7. Description step: Gemini with the provider response schema on title + description, output limits, grounding, the title rule, one transient retry within budget, satisfies **AC-5**, **AC-6**, **AC-12**
-8. `extractFromYouTube` orchestration: reserve, the ladder rules, save and finish through #3's RPC with the YouTube columns and attempt ID, failure finish with summed tokens, redirect rethrow, the outcome and message table, satisfies **AC-7**, **AC-9**, **AC-11**
-9. Pending state and messages in the shared form; `maxDuration = 90` on each route hosting it; "From …" provenance line, derived thumbnail and the already in library notice on the recipe page, satisfies **AC-3**, **AC-4**, **AC-5**, **AC-9**, **AC-10**
+1. [ ] Enable the YouTube Data API v3, create the restricted `YOUTUBE_API_KEY`, add it to Vercel and `.env.local`, list it in `.env.example`, validate it in a `server-only` env reader, satisfies **AC-5**
+2. [x] `parse-youtube-url.ts` and `isYouTubeHost` (pure) plus host routing in `addRecipeFromLink`, satisfies **AC-1**, **AC-2**
+3. [x] `open_existing_recipe` before reservation, and the `out_created: false` redirect after `save_recipe`, satisfies **AC-3**, **AC-13**
+4. [x] `youtube-metadata.ts`: `videos.list` with zod parsing, the watchability table, the step budget, and key free error logging, satisfies **AC-8**, **AC-9**, **AC-11**
+5. [x] `grounding.ts` (pure): source cleaning, tokens and `singular()`, number values, names, same segment quantity and unit, step numbers and `ungrounded_step`, then recheck the contract; reuse it in #6's page text path, satisfies **AC-6**
+6. [x] `creator-page.ts`: link harvest, deny list, ranking, 2 parallel `safeFetch` + JSON-LD, title overlap with `STOP_WORDS`, satisfies **AC-4**
+7. [x] Description step: Gemini with the provider response schema on title + description, output limits, grounding, the title rule, one transient retry within budget, satisfies **AC-5**, **AC-6**, **AC-12**
+8. [x] `extractFromYouTube` orchestration: reserve, the ladder rules, save and finish through #3's RPC with the YouTube columns and attempt ID, failure finish with summed tokens, redirect rethrow, the outcome and message table, satisfies **AC-7**, **AC-9**, **AC-11**
+9. [x] Pending state and messages in the shared form; `maxDuration = 90` on each route hosting it; "From …" provenance line, derived thumbnail and the already in library notice on the recipe page, satisfies **AC-3**, **AC-4**, **AC-5**, **AC-9**, **AC-10**
 10. `/check verify` slice 1 against AC-1 to AC-13 on real videos (one with a creator page, one with a description recipe, one with neither, one deleted)
 
 **Slice 2: grounded transcript (gated)**

@@ -3,7 +3,7 @@ import { errorMessages } from "@/lib/auth/messages";
 
 export type MessageSource = "web" | "youtube";
 
-/** Keyed `source:reason`, with `any:reason` as the fallback. #7 adds its `youtube:` rows. */
+/** Keyed `source:reason`, with `any:reason` as the fallback. */
 const MESSAGES: ReadonlyMap<string, string> = new Map([
   ["any:invalid_link", "Paste a full link that starts with https://"],
   ["any:signed_out", "You're signed out. Sign in again to add recipes."],
@@ -73,7 +73,47 @@ const MESSAGES: ReadonlyMap<string, string> = new Map([
     "We found a recipe, but some steps weren't stated clearly on the page, so we didn't save it.",
   ],
   ["any:not_a_recipe", "This link does not contain a recipe."],
+  ["youtube:blocked_url", "That YouTube link doesn't point to a video."],
+  [
+    "youtube:video_unavailable",
+    "This video isn't available. It may be private, deleted or still live.",
+  ],
+  [
+    "youtube:metadata_unavailable",
+    "We couldn't reach YouTube just now. Try again in a minute.",
+  ],
+  [
+    "youtube:timeout",
+    "This took too long. Try again, or paste a link to the recipe page.",
+  ],
+  [
+    "youtube:invalid_model_output",
+    "Something went wrong reading this video. Try again.",
+  ],
+  [
+    "youtube:no_written_recipe",
+    "This video doesn't include a written recipe we can read yet.",
+  ],
+  [
+    "youtube:video_too_long",
+    "This video is too long for us to watch. Paste one under 20 minutes, or a link to its recipe page.",
+  ],
+  [
+    "youtube:video_not_watchable",
+    "We can't watch this video, and its description has no recipe.",
+  ],
+  [
+    "youtube:no_stated_recipe",
+    "We found cooking content but not a full recipe. Nothing in the video states the ingredients and steps.",
+  ],
+  [
+    "youtube:ungrounded_step",
+    "We found a recipe, but some steps weren't stated clearly in the video, so we didn't save it.",
+  ],
 ]);
+
+export const ALREADY_IN_LIBRARY_VIDEO_NOTICE =
+  "This video is already in the library.";
 
 export const ALREADY_IN_LIBRARY_NOTICE =
   "This recipe is already in the library. We added it to your collection.";

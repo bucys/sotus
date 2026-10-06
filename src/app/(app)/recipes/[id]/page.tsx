@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react";
@@ -7,11 +8,16 @@ import { AuthUnavailable } from "@/components/auth/auth-unavailable";
 import { PageContainer } from "@/components/shell/page-container";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ALREADY_IN_LIBRARY_NOTICE } from "@/lib/extraction/messages";
+import {
+  ALREADY_IN_LIBRARY_NOTICE,
+  ALREADY_IN_LIBRARY_VIDEO_NOTICE,
+} from "@/lib/extraction/messages";
+import { thumbnailUrl } from "@/lib/extraction/youtube/parse-youtube-url";
 import {
   ingredientAmount,
   loadRecipe,
-  sourceHost,
+  provenanceLine,
+  type RecipeVideo,
 } from "@/lib/recipes/load-recipe";
 
 type RecipePageProps = {
@@ -62,13 +68,17 @@ export default async function RecipePage({
       <header className="flex flex-col gap-2">
         <h1 className="type-display text-balance">{recipe.title}</h1>
         <p className="type-caption text-muted-foreground">
-          From {sourceHost(recipe.sourceUrl)}
+          {provenanceLine(recipe)}
         </p>
       </header>
 
       {notice === "already-in-library" ? (
         <Alert tone="info">
-          <AlertDescription>{ALREADY_IN_LIBRARY_NOTICE}</AlertDescription>
+          <AlertDescription>
+            {recipe.video
+              ? ALREADY_IN_LIBRARY_VIDEO_NOTICE
+              : ALREADY_IN_LIBRARY_NOTICE}
+          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -113,13 +123,52 @@ export default async function RecipePage({
         </ol>
       </section>
 
-      <Button variant="outline" asChild className="self-start">
-        <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer">
-          View the original
-          <ExternalLinkIcon aria-hidden="true" />
-          <span className="sr-only">(opens in a new tab)</span>
-        </a>
-      </Button>
+      {recipe.video ? (
+        <VideoSource video={recipe.video} url={recipe.sourceUrl} />
+      ) : (
+        <OriginalLink url={recipe.sourceUrl} label="View the original" />
+      )}
     </PageContainer>
+  );
+}
+
+function OriginalLink({ url, label }: { url: string; label: string }) {
+  return (
+    <Button variant="outline" asChild className="self-start">
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        {label}
+        <ExternalLinkIcon aria-hidden="true" />
+        <span className="sr-only">(opens in a new tab)</span>
+      </a>
+    </Button>
+  );
+}
+
+function VideoSource({ video, url }: { video: RecipeVideo; url: string }) {
+  const caption = [video.title, video.channelTitle].filter(Boolean).join(" · ");
+  return (
+    <section aria-labelledby="video-heading" className="flex flex-col gap-3">
+      <h2 id="video-heading" className="type-heading">
+        The video
+      </h2>
+      <Image
+        src={thumbnailUrl(video.videoId)}
+        alt={
+          video.title
+            ? `Thumbnail of the video ${video.title}`
+            : "Video thumbnail"
+        }
+        width={480}
+        height={360}
+        sizes="(min-width: 768px) 480px, 100vw"
+        className="aspect-video w-full max-w-md rounded-lg border object-cover"
+      />
+      {caption ? (
+        <p className="type-caption text-pretty text-muted-foreground">
+          {caption}
+        </p>
+      ) : null}
+      <OriginalLink url={url} label="Watch on YouTube" />
+    </section>
   );
 }

@@ -94,18 +94,18 @@ spec [0006](../specs/0006-recipe-from-web-page-link/index.md) · builds the shar
   - [x] Slice A foundations: dependencies, reasons and messages, schemas, deadline, host rules and `safeFetch`, title, JSON-LD and ingredient readers, `pnpm check:extraction` (AC-1, AC-4, AC-5, AC-10, AC-11, AC-15, AC-17)
   - [x] Slice A thread: `addRecipeFromLink` with auth, dedup, quota and signed save, the "Add a link" form, the minimal recipe page (AC-1 to AC-3, AC-11 to AC-14, AC-16, AC-17)
   - [x] Slice B: page text, Gemini client and failure mapping, grounding, the fallback wired in (AC-6 to AC-10)
-  - [ ] Slice C: #7 slice 1 plugged into the same router (AC-15)
+  - [x] Slice C: #7 slice 1 plugged into the same router (AC-15)
 - [ ] Verify it, together with #7 slice 1: `/check verify recipe from a web page link`
 
 ### 7. Recipe from a YouTube link · in-progress
 Paste a YouTube video or Short and get the same structured recipe, so the recipe is no longer buried in the video. The headline demo moment.
 **Done when:** pasting a YouTube cooking video or Short produces a saved recipe linked to the video; a video with no usable recipe content shows a clear message instead of a made up recipe.
-spec [0002](../specs/0002-recipe-from-youtube-link/index.md) · builds after #3 and #6
+spec [0002](../specs/0002-recipe-from-youtube-link/index.md) · builds after #3 and #6 · code in `src/lib/extraction/youtube/`
 - [x] Design it (spec): `/architect recipe from a youtube link`
 - [ ] Build it: `/develop recipe from a youtube link`
   - [ ] Slice 1 foundations: YouTube key, link parsing and routing, duplicate check, Data API metadata (AC-1, AC-2, AC-3, AC-8, AC-13)
-  - [ ] Slice 1 extraction: grounding, creator page, description step, orchestration and save (AC-4 to AC-7, AC-9, AC-11, AC-12)
-  - [ ] Slice 1 UI: pending state, messages, provenance line and notice (AC-10)
+  - [x] Slice 1 extraction: grounding, creator page, description step, orchestration and save (AC-4 to AC-7, AC-9, AC-11, AC-12)
+  - [x] Slice 1 UI: pending state, messages, provenance line and notice (AC-10)
   - [ ] Spike 2: grounded transcript on the five videos, evidence in spec 0002 (gates slice 2)
   - [ ] Slice 2: grounded transcript step, only if spike 2 passes (AC-14 to AC-16)
 - [ ] Verify it: `/check verify recipe from a youtube link`

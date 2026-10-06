@@ -13,19 +13,24 @@ import {
 } from "@/lib/ai/quota";
 import { signInPath } from "@/lib/auth/origin";
 import { requireActionUser } from "@/lib/auth/require-user";
+import type { RecipeSourceFields } from "@/lib/recipes/sign-payload";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import type { AddLinkState } from "./add-link-state";
+import type { ExtractionOutcome } from "./contract";
 import {
   STEP_BUDGET_MS,
   createDeadline,
   raceSignal,
   stepSignal,
+  type Deadline,
 } from "./deadline";
 import { extractFromWeb } from "./extract-from-web";
 import { isYouTubeHost, normalizeHost } from "./hosts";
 import { messageFor, type MessageSource } from "./messages";
 import { linkInputSchema } from "./schemas";
+import { extractFromYouTube } from "./youtube/extract-from-youtube";
+import { parseYouTubeUrl } from "./youtube/parse-youtube-url";
 
 const NO_TOKENS: Tokens = { input: 0, output: 0 };
 
@@ -33,6 +38,11 @@ const recipePath = (recipeId: string, duplicate: boolean) =>
   duplicate
     ? `/recipes/${recipeId}?notice=already-in-library`
     : `/recipes/${recipeId}`;
+
+// A link that is not a usable YouTube video is a field error, like a malformed link.
+const isFieldError = (source: MessageSource, reason: ActionReason) =>
+  reason === "invalid_link" ||
+  (source === "youtube" && reason === "blocked_url");
 
 function failure(
   url: string,
@@ -44,7 +54,7 @@ function failure(
     url,
     reason,
     message: messageFor(source, reason),
-    target: reason === "invalid_link" ? "field" : "alert",
+    target: isFieldError(source, reason) ? "field" : "alert",
     ...(reason === "signed_out"
       ? { signInHref: signInPath(undefined, "/") }
       : {}),
@@ -61,6 +71,34 @@ type Attempt = {
   readonly supabase: Supabase;
   readonly attemptId: string;
 };
+
+type Extraction = {
+  readonly result: ExtractionOutcome;
+  readonly fields: RecipeSourceFields;
+  readonly tokens: Tokens;
+  readonly log: Readonly<Record<string, unknown>>;
+};
+
+/** Everything that differs between a web page and a YouTube video after parsing. */
+type Route = {
+  readonly source: MessageSource;
+  readonly attemptKind: "extract_web" | "extract_youtube";
+  /** The URL dedup, the attempt and the recipe use: the link itself, or the canonical video URL. */
+  readonly sourceUrl: string;
+  readonly extract: (deadline: Deadline) => Promise<Extraction>;
+};
+
+function webRoute(url: string): Route {
+  return {
+    source: "web",
+    attemptKind: "extract_web",
+    sourceUrl: url,
+    extract: async (deadline) => {
+      const { sourceTitle, ...rest } = await extractFromWeb(url, deadline);
+      return { ...rest, fields: { source_title: sourceTitle } };
+    },
+  };
+}
 
 /**
  * The one entry point for a pasted link, shared by web pages (#6) and YouTube (#7).
@@ -79,49 +117,63 @@ export async function addRecipeFromLink(
   const url = parsedLink.data;
   const host = normalizeHost(new URL(url).hostname);
 
+  let route: Route;
+  if (isYouTubeHost(url)) {
+    // The pasted URL stops here: only the video ID and canonical URL go further.
+    const video = parseYouTubeUrl(url);
+    if (!video) return failure(raw, "blocked_url", "youtube");
+    route = {
+      source: "youtube",
+      attemptKind: "extract_youtube",
+      sourceUrl: video.canonicalUrl,
+      extract: (routeDeadline) => extractFromYouTube(video, routeDeadline),
+    };
+  } else {
+    route = webRoute(url);
+  }
+  const fail = (reason: ActionReason) => failure(raw, reason, route.source);
+
   let stage: PreAttemptStage = "auth";
   let attempt: Attempt | undefined;
   try {
     // Auth and the duplicate lookup share one 2 s budget; an abort here leaves no row.
     const preAttemptSignal = stepSignal(deadline, STEP_BUDGET_MS.authAndDedup);
     const user = await raceSignal(requireActionUser(), preAttemptSignal);
-    if (!user.ok) return failure(raw, user.reason);
-
-    if (isYouTubeHost(url)) {
-      // #7 slice 1 plugs `extractFromYouTube` in here. #6 and #7 ship together
-      // (0006 AC-15), so this branch must not reach production before it does.
-      return failure(raw, "blocked_url");
-    }
+    if (!user.ok) return fail(user.reason);
 
     stage = "dedup";
     const supabase = await createSupabaseServerClient();
     const existing = await openExistingRecipe(
       supabase,
-      "web",
-      url,
+      route.source,
+      route.sourceUrl,
       preAttemptSignal,
     );
     if (!existing.ok) {
       logPreAttemptFailure("dedup", host);
-      return failure(raw, existing.reason);
+      return fail(existing.reason);
     }
     if (existing.recipeId) redirect(recipePath(existing.recipeId, true));
 
     stage = "reserve";
-    const reserved = await reserveAttempt(supabase, "extract_web", url);
+    const reserved = await reserveAttempt(
+      supabase,
+      route.attemptKind,
+      route.sourceUrl,
+    );
     if (!reserved.ok) {
       if (reserved.reason === "service_unavailable")
         logPreAttemptFailure("reserve", host);
-      return failure(raw, reserved.reason);
+      return fail(reserved.reason);
     }
     attempt = { supabase, attemptId: reserved.attemptId };
 
-    const extraction = await extractFromWeb(url, deadline);
+    const extraction = await route.extract(deadline);
     const { result, tokens } = extraction;
     const logLine = (outcome: string, reason: string | undefined) => {
       const line = {
         event: "extraction",
-        kind: "extract_web",
+        kind: route.attemptKind,
         attempt_id: reserved.attemptId,
         host,
         outcome,
@@ -145,7 +197,7 @@ export async function addRecipeFromLink(
         result.reason,
         tokens,
       );
-      return failure(raw, result.reason);
+      return fail(result.reason);
     }
 
     const saved = await saveRecipe(
@@ -155,7 +207,7 @@ export async function addRecipeFromLink(
       {
         title: result.recipe.title,
         extraction_method: result.method,
-        source_title: extraction.sourceTitle,
+        ...extraction.fields,
         ingredients: result.recipe.ingredients,
         steps: result.recipe.steps,
       },
@@ -170,7 +222,7 @@ export async function addRecipeFromLink(
         saved.reason,
         tokens,
       );
-      return failure(raw, saved.reason);
+      return fail(saved.reason);
     }
 
     logLine("recipe", saved.created ? undefined : "already_saved");
@@ -181,12 +233,12 @@ export async function addRecipeFromLink(
 
     if (!attempt) {
       logPreAttemptFailure(stage, host);
-      return failure(raw, "service_unavailable");
+      return fail("service_unavailable");
     }
     console.error(
       JSON.stringify({
         event: "extraction",
-        kind: "extract_web",
+        kind: route.attemptKind,
         attempt_id: attempt.attemptId,
         host,
         outcome: "ingestion_failed",
@@ -201,6 +253,6 @@ export async function addRecipeFromLink(
       "internal_error",
       NO_TOKENS,
     );
-    return failure(raw, "internal_error");
+    return fail("internal_error");
   }
 }

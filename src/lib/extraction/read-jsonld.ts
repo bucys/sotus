@@ -21,6 +21,8 @@ export type JsonLdResult =
       readonly multiple?: false;
       readonly usable: true;
       readonly recipe: AcceptedRecipe;
+      /** The JSON-LD `name` itself, before any page title fallback. */
+      readonly name?: string;
     };
 
 type JsonObject = { readonly [key: string]: unknown };
@@ -199,6 +201,6 @@ export function readJsonLd(
   });
 
   return parsed.success
-    ? { found: true, usable: true, recipe: parsed.data }
+    ? { found: true, usable: true, recipe: parsed.data, name }
     : { found: true, usable: false, why: describeFailure(parsed.error), name };
 }

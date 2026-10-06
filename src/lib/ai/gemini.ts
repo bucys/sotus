@@ -204,3 +204,33 @@ export async function generateRecipe(
   const second = await callOnce(2, systemInstruction, prompt, signal);
   return { ...second, calls: 2, tokens: sum(first.tokens, second.tokens) };
 }
+
+/**
+ * The YouTube variant (0002 *Step budgets*): each call gets a full step budget of its
+ * own. `nextSignal` returns that budget's signal, or `undefined` when it no longer fits
+ * before the deadline, in which case the retry is not started.
+ */
+export async function generateRecipeInSteps(
+  systemInstruction: string,
+  prompt: string,
+  nextSignal: () => AbortSignal | undefined,
+): Promise<GeminiResult> {
+  const firstSignal = nextSignal();
+  if (!firstSignal) {
+    return {
+      ok: false,
+      failure: { reason: "timeout", retry: false, row: "no_budget" },
+      calls: 0,
+      tokens: NO_TOKENS,
+    };
+  }
+  const first = await callOnce(1, systemInstruction, prompt, firstSignal);
+  if (first.ok || !first.failure.retry) return { ...first, calls: 1 };
+
+  await pause(RETRY_PAUSE_MS, firstSignal);
+  const retrySignal = nextSignal();
+  if (!retrySignal) return { ...first, calls: 1 };
+
+  const second = await callOnce(2, systemInstruction, prompt, retrySignal);
+  return { ...second, calls: 2, tokens: sum(first.tokens, second.tokens) };
+}
