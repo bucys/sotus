@@ -108,7 +108,7 @@ spec [0002](../specs/0002-recipe-from-youtube-link/index.md) · builds after #3 
   - [x] Slice 1 UI: pending state, messages, provenance line and notice (AC-10)
   - [ ] Spike 2: grounded transcript on the five videos, evidence in spec 0002 (gates slice 2)
   - [ ] Slice 2: grounded transcript step, only if spike 2 passes (AC-14 to AC-16)
-- [ ] Verify it: `/check verify recipe from a youtube link`
+- [x] Verify it: `/check verify recipe from a youtube link`
 
 ### 8. Recipe page
 One readable, cook friendly view of a recipe: ingredients, steps, source link, who added it.
