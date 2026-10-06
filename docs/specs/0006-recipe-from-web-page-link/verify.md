@@ -114,3 +114,20 @@ _Drafted by `/architect` with the spec, so the deterministic parser, fetch and h
 - [ ] Signed out POST → signed out message with a sign in link, no row; signed out visit to `/recipes/<id>` → `/sign-in?next=%2Frecipes%2F<id>`; Supabase blocked → action shows the unavailable message, page renders `AuthUnavailable`; `/recipes/not-a-uuid` → 404 → AC-14, AC-16
 - [ ] Database blocked after sign in → `service_unavailable`, no row; forced throw after reservation → row `internal_error`; forced finish failure → original message shown, `finish_failed` logged → AC-17
 - [ ] Record the `GEMINI_MODEL` ID used, and confirm `temperature: 0` and `thinkingBudget: 0` are accepted by it → AC-6
+
+## Added by /develop · 2026-10-06
+_Value sourcing and build notes. Same format; `/check verify` runs these with the steps above._
+
+### Value sourcing
+- [ ] Paste a link that redirects (for example an `http://` link that goes to `https://`) → the saved row's `source_url` is the trimmed pasted link, not the redirect target; the log line shows `redirects` ≥ 1 and `redirected` → AC-11
+- [ ] Paste a link with spaces around it → `source_url` and the duplicate lookup use the trimmed link; after a failure the field shows exactly what was typed, spaces included → AC-1, AC-11, AC-12
+- [ ] A page with both `og:title` and `<title>` → `source_title` is the `og:title`; a page with JSON-LD `name` → `title` is that name, not the page title → AC-11
+- [ ] A `www.` host → the recipe page shows "From example.com" (no `www.`) and the tab title is "<recipe title> · Sotus" → AC-14
+- [ ] An ingredient saved with no quantity and no unit → the recipe page shows the name, then "(amount not given)" in muted text → AC-14
+- [ ] A JSON-LD save → the attempt row has 0 input and 0 output tokens; a `web_model` save → tokens match the log line's `input_tokens` and `output_tokens` → AC-5, AC-6
+- [ ] A signed out attempt → the "Sign in" link points at `/sign-in` (0005's `signInPath` drops `next` when it is `/`) → AC-16
+
+### Fixture and tooling notes
+- [ ] `https://httpbin.org/response-headers?status=302` really answers 200, so it gives `unsupported_content`, not the "302 without Location" case. Use a local stub or another host that sends a bare 302 → AC-4
+- [ ] The Gemini failure switch is `GEMINI_TEST_FAILURE` in `.env.local` (`503-twice`, `503-late`, `429-daily`). It only works under `pnpm dev` and is ignored in every other environment. Remove it after the run → AC-9, AC-10
+- [ ] The live `safeFetch` cases run against the real network with `node --conditions=react-server --experimental-strip-types` (the `react-server` condition lets the `server-only` import load outside Next.js) → AC-4
