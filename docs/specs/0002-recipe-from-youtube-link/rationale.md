@@ -78,6 +78,31 @@ Resolved after the cross check (2026-09-30), all on the recommended fix:
 - **Thumbnail derived from the video ID**, over storing the API URL: one less stored API field under the YouTube data policy, and a fixed host.
 - **Title word overlap stays at one shared word**, over requiring half the title: clickbait video titles share few words with the recipe name.
 
+Slice 2 reworked on 2026-10-06, after slice 1 shipped and passed verify, before spike 2 ran. Each call with its runner up:
+
+- **Spike before building stays the gate**, over building behind the switch and judging with `/check verify`: an invented word in a transcript looks exactly like a real one, so only a planned manual review over many runs can catch it, and a failure then costs a script, not built code.
+- **10 minute cap, spike may only lower it**, over 20 minutes: a word for word transcript of 20 minutes is unlikely to fit 8192 output tokens or a 25 s budget, and the headline case is a Short. Runner up: 3 minutes (Shorts only), safest but drops most short recipe videos.
+- **Same `GEMINI_MODEL` with its own pinned settings**, over a separate `GEMINI_VIDEO_MODEL`: one model and one env var to keep in sync; the spike's rerun path can still introduce a second model if evidence demands it.
+- **`YOUTUBE_TRANSCRIPT=on` switch**, over reverting a commit: the step's risk (pass 1 is model output that grounding trusts) is exactly the kind of blast radius a switch is for; off restores slice 1 with an env change.
+- **Pass 1 as plain text with three markers**, over a JSON response schema: cut off JSON can't be read at all, and plain text lets the cut off case be recognised cleanly from the finish reason and a small pure parser `check:extraction` can cover. Cost: the SDK no longer checks the shape.
+- **A cut off transcript is not used**, over grounding against the part that arrived: grounding proves every saved value was stated, but it can't notice a missing final step, and a recipe without its bake step cooks wrong.
+- **Spike set of 0001's five plus a spoken only Short and an 8 to 10 minute video**: keeps the comparison with spike 1 and adds the two cases slice 2 exists for (the headline Short and the cap).
+- **Zero invented values across 21 runs per resolution**, over allowing one miss: a miss is a wrong recipe in the shared library that nobody can correct before an admin path exists (0003).
+- **Compare low and default media resolution**: low uses roughly a quarter of the video tokens and runs faster, but may misread small on screen captions; only the spike can say which one passes.
+- **On a fail, one rerun on a stronger model before deciding**, over shipping slice 1 as final straight away (the engineer's call): a grounding failure can be specific to one model, and one more run is cheap next to dropping the headline case.
+
+Resolved after the slice 2 cross check (2026-10-06), all on the recommended fix:
+
+- **`transcript_cut_off` outranks partial content**: the cut off is why the step that could have finished the recipe failed, so it's the more useful message.
+- **Step 3 unreadable or blocked output ends `ingestion_failed`** when nothing more informative was seen, so `no_written_recipe` stays unreachable with the switch on.
+- **Reuse `classifyGeminiResponse`** for blocked and empty answers; `RECITATION` is a real risk for word for word transcripts and maps to the existing `model_blocked`.
+- **Thinking budget fixed at 0** for pass 1: thinking tokens count against the output limit and would fake cut offs.
+- **Digits and one sentence per line in pass 1**: grounding matches number words only up to twelve, and unpunctuated speech has no sentence breaks; lines make the segments exact without a sentence splitter.
+- **The prompt is a named constant written for the spike** and shipped unchanged, hashed in the evidence, so the spike measures the prompt that ships.
+- **`FOOD: no` ends `not_a_recipe` directly**, over handing a talky non food video to pass 2: saves a call; spike 1 classified 15 of 15 runs right.
+- **Headroom in the pass bar** (20 s, 8 s, half the token limit), so a pass does not mean production timeouts or regular cut offs.
+- **Cost is informational**: the per user and app wide attempt limits already cap spend.
+
 ## Evidence: spike 2
 
 Not run yet. Build plan task 11 records it here: run configuration, per video and per run outcomes, the manual grounding review per 0001's rules, and the verdict.
