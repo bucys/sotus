@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { LogOut } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -25,11 +25,12 @@ type AccountMenuProps = {
 
 export function AccountMenu({ displayName, avatarUrl }: AccountMenuProps) {
   const [state, signOutAction] = useActionState(signOut, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
 
   return (
     <>
       {/* Outside the menu content: closing the menu on select must not unmount the form before it submits. */}
-      <form id="sign-out-form" action={signOutAction} />
+      <form ref={formRef} id="sign-out-form" action={signOutAction} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -53,11 +54,11 @@ export function AccountMenu({ displayName, avatarUrl }: AccountMenuProps) {
         <DropdownMenuContent>
           <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <button type="submit" form="sign-out-form" className="w-full">
-              <LogOut aria-hidden="true" />
-              Sign out
-            </button>
+          {/* Not a submit button: Radix unmounts the menu inside the click, and a
+              detached button submits nothing, so the form is submitted directly. */}
+          <DropdownMenuItem onSelect={() => formRef.current?.requestSubmit()}>
+            <LogOut aria-hidden="true" />
+            Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
