@@ -6,17 +6,6 @@ import {
   type VideoDetailsResult,
 } from "./video-details";
 
-function required(name: string, value: string | undefined) {
-  if (!value) {
-    throw new Error(
-      `Missing environment variable ${name}. Copy .env.example to .env.local and fill it in.`,
-    );
-  }
-  return value;
-}
-
-const apiKey = required("YOUTUBE_API_KEY", process.env.YOUTUBE_API_KEY);
-
 const FIELDS =
   "items(snippet(title,description,channelTitle,thumbnails,liveBroadcastContent),contentDetails(duration,regionRestriction,contentRating/ytRating),status/privacyStatus)";
 
@@ -32,6 +21,16 @@ export async function fetchVideoMetadata(
   videoId: string,
   signal: AbortSignal,
 ): Promise<MetadataResult> {
+  // Read per call, not at import: the shared add link action loads this module for web
+  // links too, and a missing YouTube key must not take the web path down with it.
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    console.error(
+      JSON.stringify({ event: "youtube_not_configured", video_id: videoId }),
+    );
+    return { available: "error" };
+  }
+
   const url = new URL("https://www.googleapis.com/youtube/v3/videos");
   url.searchParams.set("id", videoId);
   url.searchParams.set("part", "snippet,contentDetails,status");
