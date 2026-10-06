@@ -1,7 +1,7 @@
 # 0006. Recipe from a web page link: JSON-LD first, grounded page text fallback
 
 **Date**: 2026-10-06
-**Status**: In Progress
+**Status**: Accepted
 
 Builds to [0001](../0001-stack-architecture/index.md) (ingestion boundary, acceptance contract, schemas, deadline, cost guard), [0003](../0003-data-model/index.md) (`open_existing_recipe`, `reserve_ai_attempt`, signed `save_recipe`, URL keys) and the *Grounding* and *Provider response schema* sections of [0002](../0002-recipe-from-youtube-link/index.md). Those specs win on any detail they own. This spec adds only what is specific to web pages, and the shared parts #6 builds first for #7 to reuse.
 
@@ -71,7 +71,7 @@ reserve_ai_attempt('extract_web', url) ─ invalid_source_url → blocked_url (n
    │                                    ─ other error → service_unavailable (no row)
 safeFetch(new URL(url).href) ─ fail → ingestion_failed / <fetch reason>
    │
-parse HTML (node-html-parser)
+parseHtml (node-html-parser, depth guarded) ─ deeper than 256 → ingestion_failed / page_unreadable
    │
 1. JSON-LD reader ─ 2+ distinct recipes → insufficient / multiple_recipes
    │             ─ one, passes accepted recipe schema → save (web_jsonld)
@@ -101,7 +101,7 @@ unexpected throw after reservation: unstable_rethrow, then ingestion_failed / in
 | Input, auth, dedup lookup | 2 s together | `AbortSignal.timeout` on the auth and dedup calls; an abort here is `service_unavailable` (no row exists yet) |
 | Quota reservation | not aborted | The reserve RPC always runs to completion, so a committed reservation is never lost to a client side abort and never leaves an orphan `started` row. The fetch only starts if the deadline check passes after it |
 | `safeFetch` | 8 s | One signal for the whole fetch: connect, every redirect hop and streaming the body |
-| Parse, JSON-LD, page text | not aborted (synchronous) | Target under 1 s on a 2 MB page; measured once in verify (pathological page) |
+| Parse, JSON-LD, page text | not aborted (synchronous) | Target under 1 s on a 2 MB page. Kept there by the depth guards in *Parsing the page*, since no `AbortSignal` can stop synchronous code. Measured: 8,000 unclosed tags took about 27 s with a bare `parse(html)`; `parseHtml` rejects the same page in about 14 ms |
 | Gemini (first call plus at most one retry) | 30 s shared | One `AbortSignal.timeout(30 s)` created before the first call and passed to both calls. The retry waits 1 s, then starts only if at least 5 s of the 30 s remain; it gets only what remains |
 | Save or finish | the 10 s margin | |
 
@@ -153,7 +153,17 @@ Built to 0001's *Ingestion boundary* table on `undici`; 0001's limits stand unch
 
 ### Parsing the page (`node-html-parser`)
 
-Parse once with `parse(html)` and share the root between the JSON-LD reader, the page title and the page text. All three are pure functions of the root, so each can be proven alone.
+Parse once with `parseHtml(html)` (`parse-html.ts`, pure) and share the root between the JSON-LD reader, the page title and the page text. All three are pure functions of the root, so each can be proven alone. Nothing else calls `parse` on fetched or untrusted markup.
+
+**Hostile markup guard** (`parse-html.ts`). A bare `parse(html)` closes every element left open at the end in time that grows with the cube of their count, and deep trees overflow the stack of the recursive walkers. Both are synchronous, so the step deadline cannot stop them. `parseHtml` bounds both:
+1. A first pass with `parse(html, { parseNoneClosedTags: true })` skips that cleanup and runs in linear time. Unclosed elements always form one ancestor chain, so measuring depth on this tree catches them.
+2. An iterative walk (no recursion) checks whether the tree is deeper than the limit. If it is, `parseHtml` returns `undefined`.
+3. Otherwise it returns exactly what `parse(html)` returns, so every reader below sees the same tree as before.
+
+Limits, as named constants:
+- **Page depth, 256** (`PAGE_DEPTH_LIMIT`). Real recipe pages measure 15 to 26 levels deep; 256 leaves room for tag soup. A page deeper than this ends `ingestion_failed` / `page_unreadable` before any reader runs, with no Gemini call, and the log line carries `too_deep: true`.
+- **JSON-LD field depth, 32** (`FIELD_DEPTH_LIMIT`). `htmlStringToLines` parses markup inside JSON-LD fields with this lower limit, since a field is a few levels deep and a page can hold thousands. A field deeper than this reads as empty (no lines), and the reader's normal blank and completeness rules handle the rest.
+- **JSON nesting, 64** (`JSON_DEPTH_LIMIT` in `read-jsonld.ts`). Real JSON-LD nests under 10 levels, and the walkers recurse once per level. Before `JSON.parse`, one linear pass counts `[` and `{` outside strings; a script nested deeper than 64 is skipped like a script that fails to parse.
 
 **HTML to lines** (`html-to-lines.ts`, pure, used by every reader below): before taking text, a line break is inserted at `<br>` and after every block element (`p`, `li`, `div`, `section`, `article`, `h1` to `h6`, `tr`, `dd`, `dt`, `blockquote`, `pre`, `figcaption`, `ol`, `ul`). Then the text is taken (entities decoded), whitespace is collapsed **within each line only**, each line is trimmed, and empty lines are dropped. Boundaries in the source are never merged into one long line.
 
@@ -325,7 +335,7 @@ Two layers, kept apart:
 
 ### Observability
 
-One JSON log line per reserved attempt (`console.info`, Vercel runtime logs): `event: "extraction"`, `kind`, `attempt_id`, `host` (normalized, never the full URL or query), `outcome`, `reason`, `method`, `http_status` (also on a failed fetch, when a response came back), `redirects` (count), `redirected` (final host differs), `jsonld` (`none` | `multiple` | `unusable:<why>` | `used`), `text_chars`, `text_trimmed` (long page rule applied), `dropped_ingredients`, `cleared_amounts`, `gemini_calls` (0, 1 or 2), `gemini_error` (the mapping row, when one applied), `fetch_ms`, `parse_ms`, `gemini_ms`, `total_ms`, `input_tokens`, `output_tokens`. Plus `event: "finish_failed"` (`console.error`) with `attempt_id` and the reason it tried to write, and `event: "pre_attempt_failed"` with the stage (`dedup` or `reserve`) for `service_unavailable`. `provider_rejected` and `internal_error` log at `console.error`. No page text, prompt, key or full URL is ever logged. #10 reads outcomes from the attempt table; these lines add the detail.
+One JSON log line per reserved attempt (`console.info`, Vercel runtime logs): `event: "extraction"`, `kind`, `attempt_id`, `host` (normalized, never the full URL or query), `outcome`, `reason`, `method`, `http_status` (also on a failed fetch, when a response came back), `redirects` (count), `redirected` (final host differs), `jsonld` (`none` | `multiple` | `unusable:<why>` | `used`), `text_chars`, `text_trimmed` (long page rule applied), `too_deep` (page rejected by the depth guard), `dropped_ingredients`, `cleared_amounts`, `gemini_calls` (0, 1 or 2), `gemini_error` (the mapping row, when one applied), `fetch_ms`, `parse_ms`, `gemini_ms`, `total_ms`, `input_tokens`, `output_tokens`. Plus `event: "finish_failed"` (`console.error`) with `attempt_id` and the reason it tried to write, and `event: "pre_attempt_failed"` with the stage (`dedup` or `reserve`) for `service_unavailable`. `provider_rejected` and `internal_error` log at `console.error`. No page text, prompt, key or full URL is ever logged. #10 reads outcomes from the attempt table; these lines add the detail.
 
 ### Value sourcing
 
@@ -483,5 +493,5 @@ Skateboard, interleaved with #7: #6 lays the shared base and a usable web path e
 - [ ] Record the exact `GEMINI_MODEL` ID used in the verify run in this spec's verify evidence; 0001's spike never captured it.
 - [ ] Deferred (add to the scope): recipe images for web recipes, needs a column and a decision on hotlinking.
 - [ ] Deferred (add to the scope): microdata recipe reader, only if #10 shows many pages without JSON-LD.
-- [ ] For `/sync`: record under `Declined:` in root `AGENTS.md` `## Agent skills`: `node-html-parser` (no skill or MCP found), `mindrally/skills@cheerio-parsing` (teaches a different library), Mealie MCP (`rldiao/mealie-mcp`) and the Apify JSON-LD extractor MCP (neither helps build our own reader). Add `node-html-parser` to the stack line, and remove `zod` and `undici` from "not installed yet" once installed.
+- [x] For `/sync`: record under `Declined:` in root `AGENTS.md` `## Agent skills`: `node-html-parser` (no skill or MCP found), `mindrally/skills@cheerio-parsing` (teaches a different library), Mealie MCP (`rldiao/mealie-mcp`) and the Apify JSON-LD extractor MCP (neither helps build our own reader). Add `node-html-parser` to the stack line, and remove `zod` and `undici` from "not installed yet" once installed.
 - [ ] Measure: after the verify run, note which test sites returned 403, to judge how much of the web Sotus can reach from Vercel.

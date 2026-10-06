@@ -11,6 +11,7 @@ contract in [0001](../../../docs/specs/0001-stack-architecture/index.md).
 - `extract-from-web.ts`: the web pipeline after reservation (`safeFetch`, JSON-LD, then Gemini on page text).
 - `youtube/`: the YouTube pipeline after reservation. `parse-youtube-url.ts` keeps only the video ID and rebuilds the canonical URL; `youtube-metadata.ts` is the only reader of `YOUTUBE_API_KEY`; `extract-from-youtube.ts` runs the ladder (creator page, then description).
 - `safe-fetch.ts` + `hop-check.ts`: the only way to fetch a user supplied web URL. Blocks private addresses at connect time and YouTube hosts on redirect.
+- `parse-html.ts`: `parseHtml`, the only caller of `node-html-parser`'s `parse`. Refuses markup deeper than 256 levels (32 for JSON-LD fields) before `parse` can block the event loop or a recursive walker overflows; callers map `undefined` to `page_unreadable` (web) or a failed link (creator page).
 - `contract.ts`: the acceptance contract every source passes; `grounding.ts` checks every value against the source text.
 - `messages.ts`: every user facing failure text, keyed `source:reason` with `any:reason` as fallback. Raw error text never reaches the user.
 - `deadline.ts`: the 75 s deadline and per step budgets (`STEP_BUDGET_MS`).
@@ -21,6 +22,7 @@ contract in [0001](../../../docs/specs/0001-stack-architecture/index.md).
 - Failures before a reservation (`invalid_link`, `signed_out`, a missing `YOUTUBE_API_KEY`, a duplicate) leave no `ai_attempts` row. After a reservation, every path finishes the attempt.
 - One `Deadline` per request, created on the action's first line. Check `fitsBudget` before a step starts and pass `stepSignal(deadline, budget)` into it.
 - Network, Gemini and quota modules import `server-only`. Parsing, grounding, ladder and schema modules stay pure (no `server-only`, no env reads) so `pnpm check:extraction` can import them directly.
+- Fetched or JSON-LD markup is parsed only through `parseHtml`, never `parse` directly; `check:extraction` fails if another file imports `parse`. Parsing is synchronous, so no `AbortSignal` can stop it.
 - Logs are one JSON line per event. Never log the pasted URL's extra parameters, description text, or the YouTube request URL (it carries the key).
 
 ## Checks

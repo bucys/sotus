@@ -1,4 +1,6 @@
-import { HTMLElement, TextNode, parse, type Node } from "node-html-parser";
+import { HTMLElement, TextNode, type Node } from "node-html-parser";
+
+import { FIELD_DEPTH_LIMIT, parseHtml } from "./parse-html.ts";
 
 const BLOCK_TAGS: ReadonlySet<string> = new Set([
   "p",
@@ -64,9 +66,10 @@ export function htmlToLines(
     .filter((line) => line !== "");
 }
 
-/** For strings that may hold markup, such as JSON-LD fields. */
+/** For strings that may hold markup, such as JSON-LD fields. Pathological markup reads as empty. */
 export function htmlStringToLines(html: string): readonly string[] {
-  return htmlToLines(parse(html));
+  const root = parseHtml(html, FIELD_DEPTH_LIMIT);
+  return root ? htmlToLines(root) : [];
 }
 
 export function htmlStringToLine(html: string): string {

@@ -1,7 +1,5 @@
 import "server-only";
 
-import { parse } from "node-html-parser";
-
 import { generateRecipe } from "@/lib/ai/gemini";
 import type { Tokens } from "@/lib/ai/quota";
 
@@ -19,6 +17,7 @@ import {
 } from "./deadline";
 import { normalizeHost } from "./hosts";
 import { PAGE_TEXT_MIN, readPageText } from "./page-text";
+import { parseHtml } from "./parse-html";
 import { TEXT_SYSTEM_INSTRUCTION, buildTextPrompt } from "./prompt";
 import { readJsonLd, type JsonLdResult } from "./read-jsonld";
 import { safeFetch } from "./safe-fetch";
@@ -77,7 +76,14 @@ export async function extractFromWeb(
   }
 
   const parseStart = Date.now();
-  const root = parse(fetched.html);
+  const root = parseHtml(fetched.html);
+  if (!root) {
+    return {
+      result: failed("ingestion_failed", "page_unreadable"),
+      tokens: NO_TOKENS,
+      log: { ...fetchLog, parse_ms: Date.now() - parseStart, too_deep: true },
+    };
+  }
   const pageTitle = readPageTitle(root);
   const sourceTitle = toSourceTitle(pageTitle);
   const jsonLd = readJsonLd(root, pageTitle);

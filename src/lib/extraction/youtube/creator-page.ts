@@ -1,7 +1,6 @@
 import "server-only";
 
-import { parse } from "node-html-parser";
-
+import { parseHtml } from "../parse-html";
 import { readJsonLd } from "../read-jsonld";
 import { safeFetch } from "../safe-fetch";
 import type { AcceptedRecipe } from "../schemas";
@@ -42,7 +41,8 @@ async function readLink(
   const fetched = await safeFetch(link, signal);
   if (!fetched.ok) return { status: "failed" };
 
-  const root = parse(fetched.html);
+  const root = parseHtml(fetched.html);
+  if (!root) return { status: "failed" };
   const jsonLd = readJsonLd(root, readPageTitle(root));
   if (!jsonLd.found || jsonLd.multiple || !jsonLd.usable) {
     return { status: "failed" };

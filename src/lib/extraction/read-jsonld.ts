@@ -62,6 +62,30 @@ const STEP_CONTAINERS: ReadonlySet<string> = new Set([
   "http://schema.org/howtosection",
 ]);
 
+/** Real JSON-LD nests under 10 levels; the walkers below recurse once per level. */
+const JSON_DEPTH_LIMIT = 64;
+
+/** One linear pass over brackets outside strings, so hostile nesting never reaches a walker. */
+function nestsDeeperThan(json: string, limit: number): boolean {
+  let depth = 0;
+  let inString = false;
+  for (let index = 0; index < json.length; index += 1) {
+    const char = json[index];
+    if (inString) {
+      if (char === "\\") index += 1;
+      else if (char === '"') inString = false;
+    } else if (char === '"') {
+      inString = true;
+    } else if (char === "[" || char === "{") {
+      depth += 1;
+      if (depth > limit) return true;
+    } else if (char === "]" || char === "}") {
+      depth -= 1;
+    }
+  }
+  return false;
+}
+
 /** Raw script text, cleaned just enough for the faults recipe plugins commonly emit. */
 function parseScript(raw: string): unknown {
   const body = raw
@@ -73,6 +97,7 @@ function parseScript(raw: string): unknown {
     .replace(/\]\]>$/, "")
     // Raw newlines inside JSON strings are invalid, and WordPress plugins emit them.
     .replace(/[\u0000-\u001F]/g, " ");
+  if (nestsDeeperThan(body, JSON_DEPTH_LIMIT)) return undefined;
   try {
     return JSON.parse(body);
   } catch {

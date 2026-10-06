@@ -1,5 +1,7 @@
 // Table driven check for the pure extraction modules (spec 0006 verify.md). Run with:
 //   node --experimental-strip-types scripts/check-extraction.mjs
+import { readdirSync, readFileSync } from "node:fs";
+
 import { parse } from "node-html-parser";
 
 import {
@@ -10,7 +12,9 @@ import { acceptModelResponse } from "../src/lib/extraction/contract.ts";
 import { ground, tokensOf } from "../src/lib/extraction/grounding.ts";
 import { checkHop } from "../src/lib/extraction/hop-check.ts";
 import { isYouTubeHost } from "../src/lib/extraction/hosts.ts";
+import { htmlStringToLines } from "../src/lib/extraction/html-to-lines.ts";
 import { readPageText } from "../src/lib/extraction/page-text.ts";
+import { parseHtml } from "../src/lib/extraction/parse-html.ts";
 import { parseIngredientLine } from "../src/lib/extraction/parse-ingredient-line.ts";
 import { readJsonLd } from "../src/lib/extraction/read-jsonld.ts";
 import {
@@ -395,6 +399,114 @@ expect(
   readPageText(parse(`<body><p>${"a".repeat(250)}</p></body>`)).chars < 300,
   true,
 );
+
+// Hostile markup is refused before `parse` can block the event loop or a walker overflows
+const timed = (fn) => {
+  const start = performance.now();
+  try {
+    return { value: fn(), ms: performance.now() - start };
+  } catch (error) {
+    return { value: error.name, ms: performance.now() - start };
+  }
+};
+const refusedOrRead = (html) => {
+  const root = parseHtml(html);
+  return root ? readPageText(root).chars : "refused";
+};
+const ordinaryPage = `<!doctype html><html><head><title>Lentil Soup | Blog</title>
+  <script type="application/ld+json">${JSON.stringify({ "@graph": [{ "@type": "WebPage" }, recipe()] })}</script>
+  </head><body><div class="wrap"><header><nav><ul><li><a href="/">Home</a><li>About</ul></nav></header>
+  <main><article><h1>Lentil Soup</h1><p>${longStory}<p>Unclosed paragraph <span>and a stray span
+  <ul><li>1 cup lentils<li>2 cups water</ul><img src="a.jpg" alt=""><br>
+  <table><tr><td>Serves<td>4</table></article></main></div><footer>Foot</footer></body></html>`;
+expect(
+  "ordinary page parses exactly as before",
+  parseHtml(ordinaryPage)?.toString(),
+  parse(ordinaryPage).toString(),
+);
+expect(
+  "ordinary page still reads",
+  [
+    usable(read(parseHtml(ordinaryPage))),
+    readPageText(parseHtml(ordinaryPage)).lines.includes("1 cup lentils"),
+  ],
+  [true, true],
+);
+const unclosed = timed(() =>
+  refusedOrRead(`<body>${"<div>".repeat(8_000)}2 cups flour</body>`),
+);
+expect(
+  "8,000 unclosed tags refused fast",
+  [unclosed.value, unclosed.ms < 1_000],
+  ["refused", true],
+);
+const deepClosed = timed(() =>
+  refusedOrRead(
+    `<body>${"<div>".repeat(50_000)}x${"</div>".repeat(50_000)}</body>`,
+  ),
+);
+expect(
+  "deep closed nesting refused without overflow",
+  [deepClosed.value, deepClosed.ms < 1_000],
+  ["refused", true],
+);
+expect(
+  "nesting at the limit still parses",
+  parseHtml(`${"<div>".repeat(200)}x${"</div>".repeat(200)}`) !== undefined,
+  true,
+);
+expect(
+  "hostile JSON-LD nesting refused",
+  [
+    read(page(`${"[".repeat(100_000)}${"]".repeat(100_000)}`)),
+    read(page(`${'{"@graph":['.repeat(50_000)}${"]}".repeat(50_000)}`)),
+    read(
+      page(
+        JSON.stringify(recipe({ recipeInstructions: [] })).replace(
+          '"recipeInstructions":[]',
+          `"recipeInstructions":${"[".repeat(100_000)}"Mix."${"]".repeat(100_000)}`,
+        ),
+      ),
+    ),
+  ],
+  [{ found: false }, { found: false }, { found: false }],
+);
+expect(
+  "brackets inside JSON strings do not count",
+  usable(
+    read(page(JSON.stringify(recipe({ name: "[".repeat(500) + "Soup" })))),
+  ),
+  true,
+);
+expect(
+  "deep markup in a JSON-LD field reads as empty",
+  htmlStringToLines(`${"<b>".repeat(5_000)}Mix.`),
+  [],
+);
+// Every parse of fetched or JSON-LD markup goes through parseHtml (web and creator page alike)
+const sourceRoot = new URL("../src/", import.meta.url);
+const rawParsers = readdirSync(sourceRoot, { recursive: true })
+  .filter((file) => /\.tsx?$/.test(file))
+  .filter((file) =>
+    /import\s*\{[^}]*\bparse\b[^}]*\}\s*from\s*"node-html-parser"/.test(
+      readFileSync(new URL(file, sourceRoot), "utf8"),
+    ),
+  );
+expect("only parse-html imports parse", rawParsers, [
+  "lib/extraction/parse-html.ts",
+]);
+for (const file of [
+  "lib/extraction/extract-from-web.ts",
+  "lib/extraction/youtube/creator-page.ts",
+]) {
+  expect(
+    `${file} guards fetched html`,
+    readFileSync(new URL(file, sourceRoot), "utf8").includes(
+      "parseHtml(fetched.html)",
+    ),
+    true,
+  );
+}
 
 // Grounding
 expect("oil is not boil", tokensOf("boil").includes("oil"), false);

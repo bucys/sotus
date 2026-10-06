@@ -18,7 +18,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3 | Data model | Foundation | done |
 | 4 | Design system & UI foundation | Foundation | done |
 | 5 | Sign in | Release 1 | in-progress |
-| 6 | Recipe from a web page link | Release 1 | in-progress |
+| 6 | Recipe from a web page link | Release 1 | done |
 | 7 | Recipe from a YouTube link | Release 1 | in-progress |
 | 8 | Recipe page | Release 1 | planned |
 | 9 | Shared recipe library | Release 1 | planned |
@@ -85,7 +85,7 @@ spec [0005](../specs/0005-sign-in/index.md) · code in `src/lib/auth/`, `src/app
   - [x] Account menu, Sign out and states (AC-5, AC-6, AC-7, AC-11)
 - [ ] Verify it: `/check verify sign in`
 
-### 6. Recipe from a web page link · in-progress
+### 6. Recipe from a web page link · done
 Paste a recipe page link and get a structured recipe (title, ingredients with amounts, steps, source). Simplest source, so it proves the extraction contract first.
 **Done when:** pasting a typical recipe page link produces a saved recipe with ingredients and steps in under a minute, and a non recipe or broken link shows a clear message.
 spec [0006](../specs/0006-recipe-from-web-page-link/index.md) · builds the shared base for #7 and ships together with #7 slice 1 · code in `src/lib/extraction/`
@@ -95,7 +95,7 @@ spec [0006](../specs/0006-recipe-from-web-page-link/index.md) · builds the shar
   - [x] Slice A thread: `addRecipeFromLink` with auth, dedup, quota and signed save, the "Add a link" form, the minimal recipe page (AC-1 to AC-3, AC-11 to AC-14, AC-16, AC-17)
   - [x] Slice B: page text, Gemini client and failure mapping, grounding, the fallback wired in (AC-6 to AC-10)
   - [x] Slice C: #7 slice 1 plugged into the same router (AC-15)
-- [ ] Verify it, together with #7 slice 1: `/check verify recipe from a web page link`
+- [x] Verify it, together with #7 slice 1: `/check verify recipe from a web page link`
 
 ### 7. Recipe from a YouTube link · in-progress
 Paste a YouTube video or Short and get the same structured recipe, so the recipe is no longer buried in the video. The headline demo moment.
